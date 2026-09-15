@@ -5,14 +5,14 @@ import * as THREE from "three";
 
 export const RING = {
   radiusVmin: 45,
-  letterSizeRatio: 0.35,
+  letterSizeRatio: 0.38,
   // negative so the front of the ring reads above its mirrored far side
   tiltDeg: -8,
   fromDeg: 102,
   toDeg: -295,
   introDurationMs: 4500,
   introBezier: [0.2, 0.9, 0.3, 0.986] as const,
-  ambientDurationMs: 150000,
+  ambientDurationMs: 100000,
   introDelayMs: 400,
   scrollSpinDegPerPx: 0.12,
   scrollYPerPx: 0.01,

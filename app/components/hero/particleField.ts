@@ -52,15 +52,21 @@ const VERT = `
     vec3 pos = aHome;
 
     // wind: trunks barely move, loose canopy dust drifts a long way
-    float t = uTime * 0.07 + aSeed * 6.2831;
+    float t = uTime * 0.11 + aSeed * 6.2831;
     vec3 flow = vec3(
       noise(pos * 0.02 + vec3(t, 0.0, 0.0)),
       noise(pos * 0.024 + vec3(0.0, t, 11.0)),
       noise(pos * 0.019 + vec3(5.0, 0.0, t))
     );
-    float spread = aDrift * mix(30.0, 9.0, uIntro);
+    float spread = aDrift * mix(34.0, 15.0, uIntro);
     pos += flow * spread;
-    pos.y += sin(uTime * 0.3 + aSeed * 11.0) * aDrift * 2.2;
+    pos.y += sin(uTime * 0.45 + aSeed * 11.0) * aDrift * 4.5;
+
+    // the whole tree rocks in slow gusts, more the higher up it is
+    float lift = clamp((aHome.y + 20.0) / 80.0, 0.0, 1.0);
+    float gust = sin(uTime * 0.5 + aHome.y * 0.03) + 0.5 * sin(uTime * 0.83 + aHome.x * 0.02);
+    pos.x += gust * lift * lift * (2.2 + aDrift * 3.5);
+    pos.z += cos(uTime * 0.41 + aHome.y * 0.025) * lift * (1.5 + aDrift * 2.0);
 
     // the text ring pushes the field away from its tube
     vec3 ringSpace = pos;
@@ -89,7 +95,7 @@ const VERT = `
     gl_Position = projectionMatrix * world;
 
     float dist = max(-world.z, 1.0);
-    gl_PointSize = aSize * uPixelRatio * (640.0 / dist);
+    gl_PointSize = aSize * uPixelRatio * (760.0 / dist);
     vFade = uIntro * (0.62 + 0.38 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 20.0)));
   }
 `;
@@ -178,18 +184,18 @@ export function createParticleField(
   const groundY = -worldHeight * 0.2;
 
   // --- the grove -------------------------------------------------------------
+  // One big tree stands at the ring's center so the words circle its trunk;
+  // the rest sit far back and small, only there to give the scene depth.
   const trees = [
-    { x: -0.46, z: -110, scale: 0.82 },
-    { x: -0.29, z: -30, scale: 1.05 },
-    { x: -0.08, z: -130, scale: 0.78 },
-    { x: 0.08, z: 10, scale: 1.12 },
-    { x: 0.27, z: -80, scale: 0.9 },
-    { x: 0.45, z: -20, scale: 1.0 },
-    { x: 0.6, z: -140, scale: 0.72 },
+    { x: 0, z: 0, scale: 1.55, heightScale: 0.84, weight: 3.4, jitter: 0 },
+    { x: -0.46, z: -190, scale: 0.85, heightScale: 0.8, weight: 0.6, jitter: 3 },
+    { x: -0.25, z: -250, scale: 0.72, heightScale: 0.74, weight: 0.45, jitter: 3 },
+    { x: 0.27, z: -240, scale: 0.75, heightScale: 0.76, weight: 0.45, jitter: 3 },
+    { x: 0.47, z: -180, scale: 0.88, heightScale: 0.82, weight: 0.6, jitter: 3 },
   ];
 
   const treeBudget = Math.round(count * 0.64);
-  const perTree = Math.round(treeBudget / trees.length);
+  const totalWeight = trees.reduce((sum, tree) => sum + tree.weight, 0);
 
   // a quadratic curve from a to b bowed through c — used for trunks and limbs
   const along = (
@@ -233,12 +239,14 @@ export function createParticleField(
   };
 
   for (const tree of trees) {
-    const baseX = tree.x * worldWidth + gauss() * 3;
+    const perTree = Math.round((treeBudget * tree.weight) / totalWeight);
+    const baseX = tree.x * worldWidth + gauss() * tree.jitter;
     const baseZ = tree.z;
-    const height = worldHeight * (0.74 + rng() * 0.14) * tree.scale;
+    const height = worldHeight * tree.heightScale * (0.95 + rng() * 0.1);
     const trunkRadius = worldWidth * 0.012 * tree.scale;
-    const lean = gauss() * 5 * tree.scale;
-    const forkY = groundY + height * (0.42 + rng() * 0.1);
+    const lean = gauss() * 3 * tree.scale;
+    // the fork sits above the text ring, so the words wrap the bare trunk
+    const forkY = groundY + height * (0.42 + rng() * 0.06);
 
     const root: [number, number, number] = [baseX, groundY - 2, baseZ];
     const fork: [number, number, number] = [baseX + lean, forkY, baseZ];
