@@ -5,12 +5,16 @@ import * as THREE from "three";
 import { createBackdrop } from "./hero/backdrop";
 import { createFluid } from "./hero/fluid";
 import { createParticleField } from "./hero/particleField";
+import { createStreamField } from "./hero/streamField";
 import { RING, createTextRing } from "./hero/textRing";
 
 const DEG = Math.PI / 180;
 // Closer than the original's 5400px so the ring's depth reads clearly: letters
 // at the front loom larger, the ones behind the tree shrink away.
 const PERSPECTIVE_PX = 1900;
+// on load the camera begins this much further back and glides in
+const ARRIVAL_PULLBACK = 1.14;
+const ARRIVAL_SECONDS = 7;
 
 export default function HeroScene({ fontFamily }: { fontFamily: string }) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -48,9 +52,11 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
 
       const scene = new THREE.Scene();
       const cameraDistance = PERSPECTIVE_PX / vmin;
+      // where the camera settles; it starts further back and pushes in to it
+      let restDistance = cameraDistance;
       const fov = 2 * Math.atan(height / 2 / PERSPECTIVE_PX) * (180 / Math.PI);
       const camera = new THREE.PerspectiveCamera(fov, width / height, 1, cameraDistance * 4);
-      camera.position.z = cameraDistance;
+      camera.position.z = cameraDistance * ARRIVAL_PULLBACK;
 
       const viewHeight = (height / vmin) * 1.02;
       const viewWidth = (width / vmin) * 1.02;
@@ -60,7 +66,8 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
 
       // --- gradient backdrop ----------------------------------------------------
       const backdropDepth = 260;
-      const backdropScale = (cameraDistance + backdropDepth) / cameraDistance;
+      // sized for the pulled-back start so it still fills the frame then
+      const backdropScale = ((cameraDistance + backdropDepth) / cameraDistance) * ARRIVAL_PULLBACK;
       const backdrop = createBackdrop(
         viewWidth * backdropScale,
         viewHeight * backdropScale,
@@ -76,6 +83,16 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
       field.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
       field.material.uniforms.uCamDist.value = cameraDistance;
       scene.add(field.points);
+
+      const stream = createStreamField(
+        isCoarse ? 6000 : 14000,
+        viewWidth,
+        viewHeight,
+        cameraDistance,
+        fluid.texture
+      );
+      stream.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+      scene.add(stream.points);
 
       // --- the "Everywhere" ring ----------------------------------------------
       // canvas2d can't parse var(), so let the browser resolve the stack first
@@ -136,15 +153,18 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
         renderer.setSize(w, h);
         camera.fov = 2 * Math.atan(h / 2 / PERSPECTIVE_PX) * (180 / Math.PI);
         camera.aspect = w / h;
-        camera.position.z = PERSPECTIVE_PX / v;
+        restDistance = PERSPECTIVE_PX / v;
         camera.updateProjectionMatrix();
         fluid.setAspect(w / h);
         field.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
-        field.material.uniforms.uCamDist.value = camera.position.z;
+        field.material.uniforms.uCamDist.value = restDistance;
+        stream.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+        stream.material.uniforms.uCamDist.value = restDistance;
+        stream.material.uniforms.uNear.value = restDistance - 20;
 
         const vh = (h / v) * 1.02;
         const vw = (w / v) * 1.02;
-        const s = (camera.position.z + backdropDepth) / camera.position.z;
+        const s = ((restDistance + backdropDepth) / restDistance) * ARRIVAL_PULLBACK;
         backdrop.mesh.geometry.dispose();
         backdrop.mesh.geometry = new THREE.PlaneGeometry(vw * s, vh * s);
         backdrop.material.uniforms.uAspect.value = w / h;
@@ -174,6 +194,11 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
         const intro = Math.min(1, elapsed / 2.6);
         const eased = intro * intro * (3 - 2 * intro);
 
+        // glide in from the pulled-back start, easing out as it settles
+        const arrival = Math.min(1, elapsed / ARRIVAL_SECONDS);
+        const arrivalEased = 1 - Math.pow(1 - arrival, 3);
+        camera.position.z = restDistance * (1 + (ARRIVAL_PULLBACK - 1) * (1 - arrivalEased));
+
         // pointer tips the ring on its X axis, damped
         const targetRotation = pointerActive ? pointerX * RING.pointerXRotationDeg : 0;
         const lerpAmount = 1 - Math.exp(-RING.pointerXRotationDamping * dt);
@@ -195,6 +220,10 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
         field.material.uniforms.uIntro.value = eased;
         field.material.uniforms.uFluid.value = fluid.texture;
         field.material.uniforms.uFluidInfluence.value = 26;
+        stream.material.uniforms.uTime.value = elapsed;
+        stream.material.uniforms.uIntro.value = eased;
+        stream.material.uniforms.uFluid.value = fluid.texture;
+        stream.material.uniforms.uFluidInfluence.value = 18;
         backdrop.material.uniforms.uOpacity.value = eased;
         backdrop.material.uniforms.uTime.value = elapsed;
 
@@ -209,6 +238,7 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
         mount.removeEventListener("pointerleave", onPointerLeave);
         ring.dispose();
         field.dispose();
+        stream.dispose();
         fluid.dispose();
         backdrop.mesh.geometry.dispose();
         backdrop.material.dispose();

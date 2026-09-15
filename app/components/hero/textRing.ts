@@ -223,7 +223,8 @@ export function createTextRing(fontFamily: string, fluidTexture: THREE.Texture):
       vertexShader: GLYPH_VERT,
       fragmentShader: GLYPH_FRAG,
       transparent: true,
-      depthWrite: false,
+      // so the dust streaming past behind a letter is hidden by it
+      depthWrite: true,
       side: THREE.DoubleSide,
     });
 
