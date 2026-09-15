@@ -24,6 +24,7 @@ const VERT = `
   uniform float uRingRadius;
   uniform float uRingTilt;
   uniform float uRingPush;
+  uniform float uCamDist;
 
   float hash(vec3 p) {
     return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
@@ -95,7 +96,9 @@ const VERT = `
     gl_Position = projectionMatrix * world;
 
     float dist = max(-world.z, 1.0);
-    gl_PointSize = aSize * uPixelRatio * (760.0 / dist);
+    // sized relative to the camera so points at the ring's plane stay the same
+    // size however close the camera sits; nearer ones grow, farther ones shrink
+    gl_PointSize = aSize * uPixelRatio * (uCamDist * 1.01 / dist);
     vFade = uIntro * (0.62 + 0.38 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 20.0)));
   }
 `;
@@ -109,6 +112,8 @@ const FRAG = `
     float r = dot(d, d);
     if (r > 0.25) discard;
     float alpha = smoothstep(0.25, 0.03, r) * vFade;
+    // the soft rim must not write depth, or it would cut halos out of the letters
+    if (alpha < 0.18) discard;
     gl_FragColor = vec4(vColor, alpha);
   }
 `;
@@ -183,19 +188,11 @@ export function createParticleField(
 
   const groundY = -worldHeight * 0.2;
 
-  // --- the grove -------------------------------------------------------------
-  // One big tree stands at the ring's center so the words circle its trunk;
-  // the rest sit far back and small, only there to give the scene depth.
-  const trees = [
-    { x: 0, z: 0, scale: 1.55, heightScale: 0.84, weight: 3.4, jitter: 0 },
-    { x: -0.46, z: -190, scale: 0.85, heightScale: 0.8, weight: 0.6, jitter: 3 },
-    { x: -0.25, z: -250, scale: 0.72, heightScale: 0.74, weight: 0.45, jitter: 3 },
-    { x: 0.27, z: -240, scale: 0.75, heightScale: 0.76, weight: 0.45, jitter: 3 },
-    { x: 0.47, z: -180, scale: 0.88, heightScale: 0.82, weight: 0.6, jitter: 3 },
-  ];
-
+  // --- the tree ----------------------------------------------------------------
+  // A single tree stands on the ring's axis (x = 0, z = 0). Its trunk rises
+  // through the middle of the ring, so letters swinging round the back pass
+  // behind it and letters at the front pass in front of it.
   const treeBudget = Math.round(count * 0.64);
-  const totalWeight = trees.reduce((sum, tree) => sum + tree.weight, 0);
 
   // a quadratic curve from a to b bowed through c — used for trunks and limbs
   const along = (
@@ -238,40 +235,53 @@ export function createParticleField(
     }
   };
 
-  for (const tree of trees) {
-    const perTree = Math.round((treeBudget * tree.weight) / totalWeight);
-    const baseX = tree.x * worldWidth + gauss() * tree.jitter;
-    const baseZ = tree.z;
-    const height = worldHeight * tree.heightScale * (0.95 + rng() * 0.1);
-    const trunkRadius = worldWidth * 0.012 * tree.scale;
-    const lean = gauss() * 3 * tree.scale;
-    // the fork sits above the text ring, so the words wrap the bare trunk
-    const forkY = groundY + height * (0.42 + rng() * 0.06);
+  {
+    const height = worldHeight * 0.92;
+    // thick and packed, so it really hides the letters passing behind it
+    const trunkRadius = worldHeight * 0.055;
+    // the fork sits above the ring, so the words wrap the bare trunk
+    const forkY = groundY + height * 0.4;
 
-    const root: [number, number, number] = [baseX, groundY - 2, baseZ];
-    const fork: [number, number, number] = [baseX + lean, forkY, baseZ];
-    const trunkBend: [number, number, number] = [baseX - lean * 0.6, (groundY + forkY) / 2, baseZ];
+    const root: [number, number, number] = [0, groundY - 3, 0];
+    const fork: [number, number, number] = [1.5, forkY, 0];
+    const trunkBend: [number, number, number] = [-1.5, (groundY + forkY) / 2, 0];
 
-    const trunkCount = Math.round(perTree * 0.2);
-    limb(trunkCount, root, trunkBend, fork, trunkRadius * 1.25, trunkRadius * 0.85, 0.85);
+    const trunkCount = Math.round(treeBudget * 0.24);
+    limb(trunkCount, root, trunkBend, fork, trunkRadius * 1.15, trunkRadius * 0.8, 1);
 
-    // limbs fork off the top of the trunk and each one carries a leaf mass
-    const limbCount = 3 + ((rng() * 3) | 0);
-    const limbBudget = Math.round(perTree * 0.12);
-    const canopyRadius = worldWidth * 0.1 * tree.scale;
+    // a flared foot so it grows out of the grass instead of standing on it
+    const rootCount = Math.round(treeBudget * 0.03);
+    for (let i = 0; i < rootCount; i++) {
+      const angle = rng() * Math.PI * 2;
+      const reach = trunkRadius * (1 + Math.pow(rng(), 1.6) * 2.4);
+      push(
+        Math.cos(angle) * reach,
+        groundY + Math.pow(rng(), 2) * trunkRadius * 1.6,
+        Math.sin(angle) * reach,
+        pick(TRUNK),
+        1.6 + rng() * 2.2,
+        0.08
+      );
+    }
+
+    // limbs fork off the top of the trunk all the way round, each carrying
+    // a leaf mass, so the crown has volume from every side as the ring turns
+    const limbCount = 7;
+    const limbBudget = Math.round(treeBudget * 0.1);
+    const canopyRadius = worldHeight * 0.3;
     const masses: { x: number; y: number; z: number; r: number }[] = [];
 
     for (let l = 0; l < limbCount; l++) {
-      const spreadAngle = ((l / Math.max(1, limbCount - 1)) - 0.5) * 2.1 + gauss() * 0.25;
-      const reach = canopyRadius * (0.7 + rng() * 0.6);
+      const around = (l / limbCount) * Math.PI * 2 + gauss() * 0.2;
+      const reach = canopyRadius * (0.75 + rng() * 0.45);
       const tip: [number, number, number] = [
-        fork[0] + Math.sin(spreadAngle) * reach,
-        fork[1] + height * (0.24 + rng() * 0.2) * Math.cos(spreadAngle * 0.6),
-        fork[2] + gauss() * reach * 0.5,
+        fork[0] + Math.cos(around) * reach,
+        fork[1] + height * (0.14 + rng() * 0.2),
+        fork[2] + Math.sin(around) * reach * 0.8,
       ];
       const bend: [number, number, number] = [
-        (fork[0] + tip[0]) / 2 + Math.sin(spreadAngle) * reach * 0.15,
-        (fork[1] + tip[1]) / 2 - height * 0.04,
+        (fork[0] + tip[0]) / 2,
+        (fork[1] + tip[1]) / 2 - height * 0.05,
         (fork[2] + tip[2]) / 2,
       ];
       limb(
@@ -279,43 +289,36 @@ export function createParticleField(
         fork,
         bend,
         tip,
-        trunkRadius * 0.7,
-        trunkRadius * 0.25,
+        trunkRadius * 0.6,
+        trunkRadius * 0.2,
         1
       );
       masses.push({
         x: tip[0],
         y: tip[1],
         z: tip[2],
-        r: canopyRadius * (0.55 + rng() * 0.35),
+        r: canopyRadius * (0.5 + rng() * 0.3),
       });
     }
     // a crown mass tying the limbs together so the top reads as one tree
-    masses.push({
-      x: fork[0] + lean * 0.4,
-      y: fork[1] + height * 0.36,
-      z: fork[2],
-      r: canopyRadius * 0.95,
-    });
+    masses.push({ x: fork[0], y: fork[1] + height * 0.4, z: fork[2], r: canopyRadius * 0.85 });
 
-    const canopyCount = perTree - trunkCount - limbBudget;
-    // warm/cool bias per tree so neighbours don't all read the same green
-    const warmth = rng();
+    const canopyCount = treeBudget - trunkCount - rootCount - limbBudget;
     for (let i = 0; i < canopyCount; i++) {
       const mass = masses[(rng() * masses.length) | 0];
       // dense leafy core with a feathered edge that sheds loose dust
-      const spread = Math.min(1.3, Math.abs(gauss()) * 0.68);
+      const spread = Math.min(1.3, Math.abs(gauss()) * 0.62);
       const theta = rng() * Math.PI * 2;
       const phi = Math.acos(rng() * 2 - 1);
       const r = mass.r * spread;
       const x = mass.x + r * Math.sin(phi) * Math.cos(theta);
-      const y = mass.y + r * Math.cos(phi) * 0.72;
-      const z = mass.z + r * Math.sin(phi) * Math.sin(theta) * 0.8;
+      const y = mass.y + r * Math.cos(phi) * 0.7;
+      const z = mass.z + r * Math.sin(phi) * Math.sin(theta);
       const roll = rng();
       const hex =
         roll > 0.94
           ? pick(BLOSSOM)
-          : roll > 0.9 - warmth * 0.08
+          : roll > 0.87
             ? pick(RUST)
             : spread < 0.25 && rng() < 0.5
               ? pick(LEAF_DEEP)
@@ -347,7 +350,7 @@ export function createParticleField(
   for (let i = 0; i < hazeCount; i++) {
     const x = (rng() - 0.5) * worldWidth * 1.2;
     const y = groundY + Math.pow(rng(), 0.7) * worldHeight * 0.95;
-    const z = -180 + rng() * 240;
+    const z = -170 + rng() * 190;
     const roll = rng();
     // the sky dust stays pale so it lifts off the gradient instead of speckling it dark
     push(
@@ -379,16 +382,19 @@ export function createParticleField(
       uRingRadius: { value: 45 },
       uRingTilt: { value: (-8 * Math.PI) / 180 },
       uRingPush: { value: 7 },
+      uCamDist: { value: 750 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
     transparent: true,
-    depthWrite: false,
-    depthTest: false,
+    // the tree has to occlude the letters that pass behind it
+    depthWrite: true,
+    depthTest: true,
   });
 
   const points = new THREE.Points(geometry, material);
   points.frustumCulled = false;
+  points.renderOrder = 1;
 
   return {
     points,

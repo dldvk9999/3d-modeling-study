@@ -8,7 +8,9 @@ import { createParticleField } from "./hero/particleField";
 import { RING, createTextRing } from "./hero/textRing";
 
 const DEG = Math.PI / 180;
-const PERSPECTIVE_PX = 5400;
+// Closer than the original's 5400px so the ring's depth reads clearly: letters
+// at the front loom larger, the ones behind the tree shrink away.
+const PERSPECTIVE_PX = 1900;
 
 export default function HeroScene({ fontFamily }: { fontFamily: string }) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -72,6 +74,7 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
       const count = isCoarse ? 36000 : 86000;
       const field = createParticleField(count, viewWidth * 1.1, viewHeight, fluid.texture);
       field.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+      field.material.uniforms.uCamDist.value = cameraDistance;
       scene.add(field.points);
 
       // --- the "Everywhere" ring ----------------------------------------------
@@ -137,6 +140,7 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
         camera.updateProjectionMatrix();
         fluid.setAspect(w / h);
         field.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
+        field.material.uniforms.uCamDist.value = camera.position.z;
 
         const vh = (h / v) * 1.02;
         const vw = (w / v) * 1.02;
@@ -179,7 +183,13 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
         ring.tiltGroup.position.y = scrollYOffset;
         ring.spinGroup.rotation.y =
           (ring.angleAt(elapsedMs) + scrollSpinDeg + smoothedPointerRotation) * DEG;
-        ring.update(elapsedMs, fluid.texture, RING.pointerRepulseStrength, eased);
+        ring.update(
+          elapsedMs,
+          fluid.texture,
+          RING.pointerRepulseStrength,
+          eased,
+          camera.position.z
+        );
 
         field.material.uniforms.uTime.value = elapsed;
         field.material.uniforms.uIntro.value = eased;

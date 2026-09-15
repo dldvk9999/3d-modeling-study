@@ -71,6 +71,7 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
 
 const GLYPH_VERT = `
   varying vec2 vUv;
+  varying float vDepth;
   uniform sampler2D uFluid;
   uniform float uFluidInfluence;
   void main() {
@@ -80,6 +81,7 @@ const GLYPH_VERT = `
     vec2 screenUv = clip.xy / clip.w * 0.5 + 0.5;
     vec2 vel = texture2D(uFluid, screenUv).xy;
     world.xy += vel * uFluidInfluence;
+    vDepth = -world.z;
     gl_Position = projectionMatrix * world;
   }
 `;
@@ -87,14 +89,19 @@ const GLYPH_VERT = `
 const GLYPH_FRAG = `
   precision highp float;
   varying vec2 vUv;
+  varying float vDepth;
   uniform sampler2D uGlyph;
   uniform vec3 uColor;
   uniform float uReveal;
   uniform float uOpacity;
+  uniform float uCamDist;
+  uniform float uRadius;
   void main() {
     float mask = texture2D(uGlyph, vUv).a;
     float wipe = smoothstep(uReveal - 0.22, uReveal + 0.02, vUv.x);
-    float alpha = mask * (1.0 - wipe) * uOpacity;
+    // letters on the far side of the ring sit in the haze behind the tree
+    float far = clamp((vDepth - uCamDist + uRadius) / (2.0 * uRadius), 0.0, 1.0);
+    float alpha = mask * (1.0 - wipe) * uOpacity * mix(1.0, 0.72, far);
     if (alpha < 0.004) discard;
     gl_FragColor = vec4(uColor, alpha);
   }
@@ -161,7 +168,13 @@ export type TextRing = {
   tiltGroup: THREE.Group;
   spinGroup: THREE.Group;
   angleAt: (elapsedMs: number) => number;
-  update: (elapsedMs: number, fluid: THREE.Texture, influence: number, opacity: number) => void;
+  update: (
+    elapsedMs: number,
+    fluid: THREE.Texture,
+    influence: number,
+    opacity: number,
+    camDist: number
+  ) => void;
   dispose: () => void;
 };
 
@@ -204,6 +217,8 @@ export function createTextRing(fontFamily: string, fluidTexture: THREE.Texture):
         uOpacity: { value: 1 },
         uFluid: { value: fluidTexture },
         uFluidInfluence: { value: 0 },
+        uCamDist: { value: 750 },
+        uRadius: { value: RING.radiusVmin },
       },
       vertexShader: GLYPH_VERT,
       fragmentShader: GLYPH_FRAG,
@@ -215,6 +230,9 @@ export function createTextRing(fontFamily: string, fluidTexture: THREE.Texture):
     const geometry = new THREE.PlaneGeometry(entry.widthEm * S, entry.heightEm * S, 6, 6);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
+    // drawn after the particles, depth-tested against them, so the tree hides
+    // whichever letters are currently swinging round behind it
+    mesh.renderOrder = 2;
     // put the glyph's baseline on the ring plane, then lift by the font's mid-line
     const centerAboveBaseline = (entry.baselineEm - entry.heightEm / 2) * S;
     mesh.position.set(0, centerAboveBaseline - verticalCenter, RING.radiusVmin);
@@ -249,7 +267,7 @@ export function createTextRing(fontFamily: string, fluidTexture: THREE.Texture):
     tiltGroup,
     spinGroup,
     angleAt: ringAngleAt,
-    update(elapsedMs, fluid, influence, opacity) {
+    update(elapsedMs, fluid, influence, opacity, camDist) {
       for (const glyph of glyphs) {
         const wordStart = RING.introDelayMs + glyph.wordIndex * RING.wordStaggerMs;
         const since = elapsedMs - wordStart;
@@ -271,6 +289,7 @@ export function createTextRing(fontFamily: string, fluidTexture: THREE.Texture):
         glyph.material.uniforms.uOpacity.value = opacity;
         glyph.material.uniforms.uFluid.value = fluid;
         glyph.material.uniforms.uFluidInfluence.value = influence;
+        glyph.material.uniforms.uCamDist.value = camDist;
       }
     },
     dispose() {
