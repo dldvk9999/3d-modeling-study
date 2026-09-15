@@ -12,6 +12,7 @@ const VERT = `
   attribute float aSeed;
   attribute float aSize;
   attribute float aDrift;
+  attribute float aForward;
 
   varying vec3 vColor;
   varying float vFade;
@@ -25,6 +26,8 @@ const VERT = `
   uniform float uRingTilt;
   uniform float uRingPush;
   uniform float uCamDist;
+  uniform float uForwardSpeed;
+  uniform float uForwardDist;
 
   float hash(vec3 p) {
     return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
@@ -69,6 +72,14 @@ const VERT = `
     pos.x += gust * lift * lift * (2.2 + aDrift * 3.5);
     pos.z += cos(uTime * 0.41 + aHome.y * 0.025) * lift * (1.5 + aDrift * 2.0);
 
+    // the tree keeps flowing at the viewer: every particle leaves its home,
+    // travels toward the camera, fades, and starts over at home. Phases are
+    // staggered so the tree always holds its shape while it streams forward.
+    float life = fract(aSeed * 13.7 + uTime * uForwardSpeed / uForwardDist);
+    pos.z += life * uForwardDist * aForward;
+    float lifeFade = smoothstep(0.0, 0.08, life) * (1.0 - smoothstep(0.62, 1.0, life));
+    lifeFade = mix(1.0, lifeFade, step(0.001, aForward));
+
     // the text ring pushes the field away from its tube
     vec3 ringSpace = pos;
     float c = cos(-uRingTilt);
@@ -99,7 +110,7 @@ const VERT = `
     // sized relative to the camera so points at the ring's plane stay the same
     // size however close the camera sits; nearer ones grow, farther ones shrink
     gl_PointSize = aSize * uPixelRatio * (uCamDist * 1.01 / dist);
-    vFade = uIntro * (0.62 + 0.38 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 20.0)));
+    vFade = uIntro * lifeFade * (0.62 + 0.38 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 20.0)));
   }
 `;
 
@@ -163,6 +174,7 @@ export function createParticleField(
   const seed: number[] = [];
   const size: number[] = [];
   const drift: number[] = [];
+  const forward: number[] = [];
   const scratch = new THREE.Color();
 
   const push = (
@@ -171,8 +183,10 @@ export function createParticleField(
     z: number,
     hex: string,
     pointSize: number,
-    driftAmount: number
+    driftAmount: number,
+    forwardAmount = 0
   ) => {
+    forward.push(forwardAmount);
     home.push(x, y, z);
     scratch.set(hex);
     const shade = 0.72 + rng() * 0.5;
@@ -230,7 +244,8 @@ export function createParticleField(
         z + Math.sin(angle) * radius * 1.2,
         rim > 0.9 ? pick(LEAF) : pick(TRUNK),
         1.5 + rng() * 2.3,
-        0.06 + rim * 0.35
+        0.06 + rim * 0.35,
+        0.55
       );
     }
   };
@@ -260,7 +275,8 @@ export function createParticleField(
         Math.sin(angle) * reach,
         pick(TRUNK),
         1.6 + rng() * 2.2,
-        0.08
+        0.08,
+        0.25
       );
     }
 
@@ -323,7 +339,7 @@ export function createParticleField(
             : spread < 0.25 && rng() < 0.5
               ? pick(LEAF_DEEP)
               : pick(LEAF);
-      push(x, y, z, hex, 1.4 + rng() * 2.6, 0.12 + spread * 0.6);
+      push(x, y, z, hex, 1.4 + rng() * 2.6, 0.12 + spread * 0.6, 1);
     }
   }
 
@@ -371,6 +387,7 @@ export function createParticleField(
   geometry.setAttribute("aSeed", new THREE.BufferAttribute(new Float32Array(seed), 1));
   geometry.setAttribute("aSize", new THREE.BufferAttribute(new Float32Array(size), 1));
   geometry.setAttribute("aDrift", new THREE.BufferAttribute(new Float32Array(drift), 1));
+  geometry.setAttribute("aForward", new THREE.BufferAttribute(new Float32Array(forward), 1));
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -383,6 +400,9 @@ export function createParticleField(
       uRingTilt: { value: (-8 * Math.PI) / 180 },
       uRingPush: { value: 7 },
       uCamDist: { value: 750 },
+      // slower than the dust stream that used to fly past (55/s)
+      uForwardSpeed: { value: 38 },
+      uForwardDist: { value: 90 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
