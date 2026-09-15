@@ -13,6 +13,7 @@ const VERT = `
   attribute float aSize;
   attribute float aDrift;
   attribute float aForward;
+  attribute vec3 aScatter;
 
   varying vec3 vColor;
   varying float vFade;
@@ -55,16 +56,25 @@ const VERT = `
     vColor = aColor;
     vec3 pos = aHome;
 
+    // Intro, in three beats:
+    //   1. every particle starts loose, scattered through the space
+    //   2. they gather (staggered, easing out) until the tree has formed
+    //   3. once formed, the tree slowly loosens and starts to flow outward
+    float delay = aSeed * 1.6;
+    float gather = clamp((uTime - 0.4 - delay) / 3.2, 0.0, 1.0);
+    gather = 1.0 - pow(1.0 - gather, 3.0);
+    float loosen = smoothstep(4.2, 13.0, uTime);
+
     // wind: trunks barely move, loose canopy dust drifts a long way
-    float t = uTime * 0.11 + aSeed * 6.2831;
+    float t = uTime * 0.09 + aSeed * 6.2831;
     vec3 flow = vec3(
       noise(pos * 0.02 + vec3(t, 0.0, 0.0)),
       noise(pos * 0.024 + vec3(0.0, t, 11.0)),
       noise(pos * 0.019 + vec3(5.0, 0.0, t))
     );
-    float spread = aDrift * mix(34.0, 15.0, uIntro);
+    float spread = aDrift * mix(5.0, 20.0, loosen);
     pos += flow * spread;
-    pos.y += sin(uTime * 0.45 + aSeed * 11.0) * aDrift * 4.5;
+    pos.y += sin(uTime * 0.4 + aSeed * 11.0) * aDrift * mix(1.5, 4.0, loosen);
 
     // the whole tree rocks in slow gusts, more the higher up it is
     float lift = clamp((aHome.y + 20.0) / 80.0, 0.0, 1.0);
@@ -75,10 +85,19 @@ const VERT = `
     // the tree keeps flowing at the viewer: every particle leaves its home,
     // travels toward the camera, fades, and starts over at home. Phases are
     // staggered so the tree always holds its shape while it streams forward.
+    // It only begins once the tree has formed, easing in as it loosens.
     float life = fract(aSeed * 13.7 + uTime * uForwardSpeed / uForwardDist);
-    pos.z += life * uForwardDist * aForward;
-    float lifeFade = smoothstep(0.0, 0.08, life) * (1.0 - smoothstep(0.62, 1.0, life));
-    lifeFade = mix(1.0, lifeFade, step(0.001, aForward));
+    pos.z += life * uForwardDist * aForward * loosen;
+    float lifeFade = smoothstep(0.0, 0.1, life) * (1.0 - smoothstep(0.6, 1.0, life));
+    lifeFade = mix(1.0, lifeFade, step(0.001, aForward) * loosen);
+
+    // travel in from the scattered start, curling round the trunk on the way
+    vec3 loose = aScatter;
+    float curl = (1.0 - gather) * 1.4;
+    float cs = cos(curl);
+    float sn = sin(curl);
+    loose.xz = vec2(loose.x * cs - loose.z * sn, loose.x * sn + loose.z * cs);
+    pos = mix(loose, pos, gather);
 
     // the text ring pushes the field away from its tube
     vec3 ringSpace = pos;
@@ -110,7 +129,9 @@ const VERT = `
     // sized relative to the camera so points at the ring's plane stay the same
     // size however close the camera sits; nearer ones grow, farther ones shrink
     gl_PointSize = aSize * uPixelRatio * (uCamDist * 1.01 / dist);
-    vFade = uIntro * lifeFade * (0.62 + 0.38 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 20.0)));
+    // loose particles read as sparse glints; they fill in as they settle
+    float settle = 0.35 + 0.65 * gather;
+    vFade = uIntro * settle * lifeFade * (0.62 + 0.38 * (0.5 + 0.5 * sin(uTime * 0.8 + aSeed * 20.0)));
   }
 `;
 
@@ -206,7 +227,7 @@ export function createParticleField(
   // A single tree stands on the ring's axis (x = 0, z = 0). Its trunk rises
   // through the middle of the ring, so letters swinging round the back pass
   // behind it and letters at the front pass in front of it.
-  const treeBudget = Math.round(count * 0.64);
+  const treeBudget = Math.round(count * 0.68);
 
   // a quadratic curve from a to b bowed through c — used for trunks and limbs
   const along = (
@@ -282,9 +303,9 @@ export function createParticleField(
 
     // limbs fork off the top of the trunk all the way round, each carrying
     // a leaf mass, so the crown has volume from every side as the ring turns
-    const limbCount = 7;
+    const limbCount = 9;
     const limbBudget = Math.round(treeBudget * 0.1);
-    const canopyRadius = worldHeight * 0.3;
+    const canopyRadius = worldHeight * 0.35;
     const masses: { x: number; y: number; z: number; r: number }[] = [];
 
     for (let l = 0; l < limbCount; l++) {
@@ -344,7 +365,7 @@ export function createParticleField(
   }
 
   // --- grass ------------------------------------------------------------------
-  const grassCount = Math.round(count * 0.24);
+  const grassCount = Math.round(count * 0.22);
   for (let i = 0; i < grassCount; i++) {
     const t = Math.pow(rng(), 1.7); // packed at the horizon, thinning downward
     const y = groundY + worldHeight * 0.05 - t * worldHeight * 0.52;
@@ -389,6 +410,20 @@ export function createParticleField(
   geometry.setAttribute("aDrift", new THREE.BufferAttribute(new Float32Array(drift), 1));
   geometry.setAttribute("aForward", new THREE.BufferAttribute(new Float32Array(forward), 1));
 
+  // where each particle starts before it gathers into the scene: a loose,
+  // wide cloud around the tree, kept behind the camera's near side
+  const total = homeArray.length / 3;
+  const scatter = new Float32Array(total * 3);
+  for (let i = 0; i < total; i++) {
+    const theta = rng() * Math.PI * 2;
+    const phi = Math.acos(rng() * 2 - 1);
+    const r = Math.cbrt(rng());
+    scatter[i * 3] = r * Math.sin(phi) * Math.cos(theta) * worldWidth * 0.75;
+    scatter[i * 3 + 1] = r * Math.cos(phi) * worldHeight * 0.65 + worldHeight * 0.05;
+    scatter[i * 3 + 2] = Math.min(90, r * Math.sin(phi) * Math.sin(theta) * 220);
+  }
+  geometry.setAttribute("aScatter", new THREE.BufferAttribute(scatter, 3));
+
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
@@ -400,9 +435,10 @@ export function createParticleField(
       uRingTilt: { value: (-8 * Math.PI) / 180 },
       uRingPush: { value: 7 },
       uCamDist: { value: 750 },
-      // slower than the dust stream that used to fly past (55/s)
-      uForwardSpeed: { value: 38 },
-      uForwardDist: { value: 90 },
+      // a slow shed: each particle takes about six seconds to drift its full
+      // distance toward the viewer before starting over
+      uForwardSpeed: { value: 12 },
+      uForwardDist: { value: 72 },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,

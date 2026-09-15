@@ -84,7 +84,7 @@ export default function HeroScene({ fontFamily }: { fontFamily: string }) {
 
       // --- particles -----------------------------------------------------------
       const isCoarse = window.matchMedia("(pointer: coarse)").matches;
-      const count = isCoarse ? 36000 : 86000;
+      const count = isCoarse ? 60000 : 150000;
       const field = createParticleField(count, viewWidth * 1.1, viewHeight, fluid.texture);
       field.material.uniforms.uPixelRatio.value = renderer.getPixelRatio();
       field.material.uniforms.uCamDist.value = cameraDistance;
