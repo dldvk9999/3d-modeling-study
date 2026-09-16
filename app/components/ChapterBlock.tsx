@@ -1,4 +1,5 @@
 import ChapterScene from "./ChapterScene";
+import WaveSections from "./WaveSections";
 import type { Chapter } from "../data/chapters";
 
 export function ChapterIntro({ chapter }: { chapter: Chapter }) {
@@ -103,9 +104,13 @@ export function ChapterFeatures({ chapter }: { chapter: Chapter }) {
 export default function ChapterBlock({ chapter }: { chapter: Chapter }) {
   return (
     <>
-      <div className="h-[100svh] w-full">
-        <ChapterIntro chapter={chapter} />
-      </div>
+      {/* each chapter arrives through the same glass wave as the first */}
+      <WaveSections
+        second={<ChapterIntro chapter={chapter} />}
+        travel={65}
+        hold={25}
+        overlap={80}
+      />
       <ChapterFeatures chapter={chapter} />
     </>
   );

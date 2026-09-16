@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 // Two full-screen sections pinned on top of each other. Scrolling doesn't move
 // them — it pulls the second one over the first along a rippling edge. The edge
@@ -36,7 +36,12 @@ function revealPath(progress: number, time: number) {
 }
 
 // a strip that hugs the wave, used as the glass
-function bandPath(progress: number, time: number, above: number, below: number) {
+function bandPath(
+  progress: number,
+  time: number,
+  above: number,
+  below: number,
+) {
   const top: string[] = [];
   const bottom: string[] = [];
   for (let i = 0; i <= SAMPLES; i++) {
@@ -52,9 +57,18 @@ function bandPath(progress: number, time: number, above: number, below: number) 
 export default function WaveSections({
   first,
   second,
+  /** how much scrolling the reveal takes, in svh. The rest holds it pinned. */
+  travel = 100,
+  hold = 0,
+  /** pull the block up over what precedes it, so that content is still on
+   *  screen behind the wave while the new section washes in (svh) */
+  overlap = 0,
 }: {
-  first: ReactNode;
+  first?: ReactNode;
   second: ReactNode;
+  travel?: number;
+  hold?: number;
+  overlap?: number;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const revealRef = useRef<HTMLDivElement>(null);
@@ -62,6 +76,8 @@ export default function WaveSections({
   const glassWideRef = useRef<HTMLDivElement>(null);
   const glassCoreRef = useRef<HTMLDivElement>(null);
   const turbulenceRef = useRef<SVGFETurbulenceElement>(null);
+  // each instance needs its own filter, or they'd all share one id
+  const filterId = `wave-glass-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -74,10 +90,26 @@ export default function WaveSections({
     let raf = 0;
     const startedAt = performance.now();
 
+    // a page of chapters means a loop each; only the one you're near matters
+    let near = true;
+    const nearby = new IntersectionObserver(
+      (entries) => {
+        near = entries[0]?.isIntersecting ?? true;
+      },
+      { rootMargin: "50% 0px" },
+    );
+    nearby.observe(wrap);
+
     const frame = () => {
+      if (!near) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
       const rect = wrap.getBoundingClientRect();
-      const travel = Math.max(1, rect.height - window.innerHeight);
-      const progress = Math.min(1, Math.max(0, -rect.top / travel));
+      const scrolled = Math.max(1, rect.height - window.innerHeight);
+      // the reveal finishes within `travel`, then the section simply holds
+      const revealSpan = Math.max(1, scrolled * (travel / (travel + hold)));
+      const progress = Math.min(1, Math.max(0, -rect.top / revealSpan));
       const time = (performance.now() - startedAt) / 1000;
 
       reveal.style.clipPath = revealPath(progress, time);
@@ -85,7 +117,8 @@ export default function WaveSections({
       inner.style.transform = `scale(${ZOOM_FROM + (1 - ZOOM_FROM) * progress})`;
 
       // the glass only exists while the two sections are meeting
-      const presence = Math.sin(Math.PI * Math.min(1, Math.max(0, progress))) ** 0.5;
+      const presence =
+        Math.sin(Math.PI * Math.min(1, Math.max(0, progress))) ** 0.5;
       glassWide.style.clipPath = bandPath(progress, time, 13, 9);
       glassCore.style.clipPath = bandPath(progress, time, 4.5, 3);
       glassWide.style.opacity = String(presence);
@@ -100,20 +133,33 @@ export default function WaveSections({
       if (turbulence) {
         const bx = 0.009 + Math.sin(time * 0.35) * 0.003;
         const by = 0.022 + Math.cos(time * 0.27) * 0.006;
-        turbulence.setAttribute("baseFrequency", `${bx.toFixed(5)} ${by.toFixed(5)}`);
+        turbulence.setAttribute(
+          "baseFrequency",
+          `${bx.toFixed(5)} ${by.toFixed(5)}`,
+        );
       }
 
       raf = requestAnimationFrame(frame);
     };
     frame();
 
-    return () => cancelAnimationFrame(raf);
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf);
+      nearby.disconnect();
+    };
+  }, [travel, hold]);
 
   return (
-    <div ref={wrapRef} className="relative h-[200svh]">
+    <div
+      ref={wrapRef}
+      className="relative"
+      style={{
+        height: `${100 + travel + hold}svh`,
+        marginTop: overlap ? `-${overlap}svh` : undefined,
+      }}
+    >
       <svg aria-hidden className="pointer-events-none absolute h-0 w-0">
-        <filter id="wave-glass" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
           <feTurbulence
             ref={turbulenceRef}
             type="fractalNoise"
@@ -133,14 +179,17 @@ export default function WaveSections({
       </svg>
 
       <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
-        <div className="absolute inset-0">{first}</div>
+        {first ? <div className="absolute inset-0">{first}</div> : null}
 
         <div
           ref={revealRef}
           className="absolute inset-0 z-20 will-change-[clip-path]"
           style={{ visibility: "hidden" }}
         >
-          <div ref={innerRef} className="h-full w-full origin-center will-change-transform">
+          <div
+            ref={innerRef}
+            className="h-full w-full origin-center will-change-transform"
+          >
             {second}
           </div>
         </div>
@@ -151,7 +200,7 @@ export default function WaveSections({
           className="pointer-events-none absolute inset-0 z-30 will-change-[clip-path]"
           style={{
             opacity: 0,
-            backdropFilter: "blur(14px) saturate(115%) url(#wave-glass)",
+            backdropFilter: `blur(14px) saturate(115%) url(#${filterId})`,
             WebkitBackdropFilter: "blur(14px) saturate(115%)",
             background:
               "linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0.01) 55%, rgba(255,255,255,0.05))",
@@ -164,7 +213,7 @@ export default function WaveSections({
           className="pointer-events-none absolute inset-0 z-40 will-change-[clip-path]"
           style={{
             opacity: 0,
-            backdropFilter: "blur(3px) brightness(1.12) url(#wave-glass)",
+            backdropFilter: `blur(3px) brightness(1.12) url(#${filterId})`,
             WebkitBackdropFilter: "blur(3px) brightness(1.12)",
             background:
               "linear-gradient(to bottom, rgba(255,255,255,0.20), rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.16))",

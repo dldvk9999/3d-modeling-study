@@ -59,6 +59,26 @@ export const CHAPTERS: Chapter[] = [
         body: "Agents can show product details from the Catalog API, including media, variants, availability, and offers from multiple sellers.",
         cta: "Read dev docs",
       },
+      {
+        title: "The open protocol for agentic commerce",
+        body: "Build agentic shopping experiences from discovery to purchase with Catalog, Cart, and Checkout MCPs powered by the Universal Commerce Protocol.",
+        cta: "Explore dev docs",
+      },
+      {
+        title: "Catalog API supports Shop sign-in",
+        body: "Add Shop sign-in to experiences built with Catalog API, so shoppers can connect their Shop account. Personalized search results coming soon.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "Experiences built with Catalog API and UCP",
+        body: "Create new ways to shop. Check out our demos: plan for a trip, ask an agent for board games, get inspiration from shows, browse photo lookalikes, and shop your star sign.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "Catalog API product lookup",
+        body: "Use the product ID or URL to retrieve real-time data, like pricing and availability, for up to 50 products in a single request.",
+        cta: "Read dev docs",
+      },
     ],
   },
   {
@@ -100,6 +120,16 @@ export const CHAPTERS: Chapter[] = [
       {
         title: "Automation tests with Sidekick",
         body: "Generate test events for Shopify Flow automations with Sidekick, and verify your logic works.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Improved editing for Sidekick-generated apps",
+        body: "Edit code, preview on desktop and mobile, and track version history in Sidekick's app editor.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Sidekick creates customers",
+        body: "Describe your customer in plain language, and Sidekick automatically fills out the form.",
         cta: "Read help doc",
       },
     ],
@@ -145,6 +175,36 @@ export const CHAPTERS: Chapter[] = [
         body: "Access company profiles, volume pricing, up to three B2B catalogs, and more from your admin at no extra cost.",
         cta: "Read help doc",
       },
+      {
+        title: "Visualized markets graph",
+        body: "Understand your Shopify Markets setup with a clearer view across discounts, products, and other settings for each market in one graph.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Variant-level publishing for products",
+        body: "Control which product variants are published by channel and per market without any workarounds.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Discounts by market",
+        body: "Run targeted promotions for customers across specific regions, different retail locations, and B2B setups.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Product compliance disclosure",
+        body: "Add mandatory warnings on products and display them on your store, in AI channels, and the Shop app.",
+        cta: "Read help doc",
+      },
+      {
+        title: "365-day sessions for customer accounts",
+        body: "Customers stay signed in for a full year, making it easier for them to pick up where they left off.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Shopify Smart Pricing app",
+        body: "Get product-level pricing tips based on your store's sales, inventory, costs, seasonality.",
+        cta: "Get app",
+      },
     ],
   },
   {
@@ -185,6 +245,31 @@ export const CHAPTERS: Chapter[] = [
       {
         title: "Cash visibility and control in Shopify POS",
         body: "Set cash rules and reason codes, track all drawer opens and activity across registers, require mid-session cash counts, and reconcile with audit trails. Exclusive to POS Pro.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Faster search in Shopify POS",
+        body: "Find products, customers, and orders faster with inline suggestions and reduced latency across every search page.",
+        cta: "Learn more",
+      },
+      {
+        title: "Gift card cashout",
+        body: "Cash out low-balance gift cards directly from Shopify POS to meet local redemption laws.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Keyboard shortcuts for Shopify POS",
+        body: "Build carts and navigate products, orders, and customers faster with a keyboard.",
+        cta: "Read help doc",
+      },
+      {
+        title: "In-store only discounts",
+        body: "Create code-based and automatic discounts that only apply in person, keeping in-store promotions separate from online.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Receive and fulfill transfers",
+        body: "Receive incoming purchase orders and fulfill outgoing transfers to your locations in Shopify POS. Exclusive to POS Pro.",
         cta: "Read help doc",
       },
     ],
@@ -230,6 +315,31 @@ export const CHAPTERS: Chapter[] = [
         body: "Publish pre-configured bundles across Google search and ads, YouTube, Facebook, and Instagram.",
         cta: "Read help doc",
       },
+      {
+        title: "Simplified setup and bidding in Shop Campaigns",
+        body: "Set up one campaign with custom bids for segments like new or lapsed customers, and run it across channels.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Standardized ads billing for Shop Campaigns",
+        body: "Shop Campaigns charges appear on your Shopify invoice with centralized reporting and billing in the admin.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Discount links attributed to campaigns",
+        body: "Attribute discount links to their associated campaign to accurately track traffic and conversion.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Marketing consent on sign-in",
+        body: "Capture email marketing opt-ins on your customer sign-in page.",
+        cta: "Read help doc",
+      },
+      {
+        title: "WhatsApp consent management",
+        body: "Control WhatsApp marketing consent in each customer's profile alongside their email and SMS consent.",
+        cta: "Read help doc",
+      },
     ],
   },
   {
@@ -268,6 +378,35 @@ export const CHAPTERS: Chapter[] = [
       {
         title: "Code editor in Shopify Flow",
         body: "Write code faster with syntax highlighting, autocomplete, and formatting in Liquid variables for Shopify Flow.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Shopify AI Toolkit",
+        body: "Manage your store from AI platforms like Claude Code, Codex, Cursor, VS Code, and more.",
+      },
+      {
+        title: "New data visualizations in analytics",
+        body: "Get a deeper understanding of your data with scatter plots, radars, bubble charts, and sunbursts.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Daily insights in analytics",
+        body: "Shopify analyzes your data and surfaces the most important trends in the analytics overview.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Automatic shipping label purchasing",
+        body: "Create rules in Shopify Flow that buy shipping labels when specific triggers occur.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Shipment-level barcode receiving",
+        body: "Scan shipment barcodes like GS1-128 to receive inventory transfers faster in the admin.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Duty calculation breakdown",
+        body: "See how duties are calculated with a detailed breakdown of each factor that contributes to the final amount.",
         cta: "Read help doc",
       },
     ],
@@ -312,6 +451,16 @@ export const CHAPTERS: Chapter[] = [
         body: "Shoppers can interact with Shop Minis from the home feed, top navigation, and product pages, so more of your products show up in new ways.",
         cta: "Learn more",
       },
+      {
+        title: "Merchandised categories",
+        body: "Shoppers can browse products and brands curated by category to find what they're looking for in Shop.",
+        cta: "Try it",
+      },
+      {
+        title: "Seamless Shop sign-in and account experience",
+        body: "Shop sign-in works with more customer accounts and features are consistent across sign-in experiences.",
+        cta: "Read help doc",
+      },
     ],
   },
   {
@@ -353,6 +502,36 @@ export const CHAPTERS: Chapter[] = [
         title: "Enhanced fraud prevention for card testing",
         body: "Shopify Payments uses improved machine learning models to block card testing attacks by scoring transactions for decline and fraud risk.",
         cta: "Read article",
+      },
+      {
+        title: "Shop Pay includes more local payment methods",
+        body: "Businesses around the globe can offer customers local and regional payment methods in one wallet with Shop Pay.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Multi-currency payouts",
+        body: "Businesses in the US, Hong Kong, and Singapore can settle in more currencies, saving on conversion fees. Coming soon to France.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Chargeback health monitoring",
+        body: "Manage and reduce your chargeback rate with proactive alerts and guidance to improve your standing.",
+        cta: "Read help doc",
+      },
+      {
+        title: "VAT ID validation at checkout",
+        body: "Collect and validate buyer VAT IDs at checkout with Shopify Tax in the EU and UK.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Customized branding in checkout, accounts, and sign-in",
+        body: "Set your logo, colors, and typography once, and it gets applied consistently across checkout, customer account, and sign-in pages.",
+        cta: "Read help doc",
+      },
+      {
+        title: "Quick Sale supports tipping, shipping, and payment links",
+        body: "Collect tips, calculate change for cash payments, add shipping, and send payment links from the Shopify app.",
+        cta: "Read help doc",
       },
     ],
   },
@@ -397,6 +576,11 @@ export const CHAPTERS: Chapter[] = [
         body: "Send domestic wire transfers to vendors from Shopify Balance for $10 per transfer. US only.",
         cta: "Read help doc",
       },
+      {
+        title: "Gift cards in local currencies",
+        body: "Sell and redeem gift cards in your customers' local currencies across markets from one store.",
+        cta: "Read help doc",
+      },
     ],
   },
   {
@@ -438,6 +622,36 @@ export const CHAPTERS: Chapter[] = [
       {
         title: "Safer app deployments",
         body: "Configure CI/CD pipelines that deploy new and updated extensions without accidentally deleting existing ones across live stores.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "App Events API",
+        body: "Send events happening in your app to Shopify, then monitor and manage your app's performance in the Dev Dashboard.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "Streamlined Metafields and Metaobjects API",
+        body: "Read and write metafields and metaobjects more easily with a simpler GraphQL API.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "Simple billing with Shopify App Pricing",
+        body: "Configure usage, recurring, or hybrid pricing models in the app submission. Shopify powers the plan selection, charge approval, and invoicing.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "Parallel reads for bulk queries",
+        body: "Run Admin API queries up to four times faster with bulk operations.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "Color palettes for themes",
+        body: "Define color palettes in settings that are available across the theme with a new color customization architecture.",
+        cta: "Read dev docs",
+      },
+      {
+        title: "Role-based access for partners",
+        body: "Manage your team through seven system roles, and create custom ones for anything else.",
         cta: "Read dev docs",
       },
     ],
