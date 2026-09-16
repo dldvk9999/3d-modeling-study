@@ -7,7 +7,12 @@ export function ChapterIntro({ chapter }: { chapter: Chapter }) {
 
   return (
     <section className="relative flex h-full w-full flex-col overflow-hidden bg-black">
-      <ChapterScene warm={warm} cool={cool} />
+      <ChapterScene
+        warm={warm}
+        cool={cool}
+        variant={chapter.scene}
+        tilt={chapter.tilt ?? 0}
+      />
 
       <div className="relative z-10 flex flex-1 flex-col justify-center px-6 text-white sm:px-14">
         <h2 className="text-[56px] leading-none font-normal tracking-tight sm:text-[76px]">
