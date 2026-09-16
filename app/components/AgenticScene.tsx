@@ -43,17 +43,18 @@ const FRAG = `
   }
 
   vec3 tintFor(float angle, float layer) {
-    // amber on one side, teal on the other, violet between — as in the original
-    vec3 amber = vec3(1.0, 0.68, 0.30);
-    vec3 teal = vec3(0.38, 0.82, 0.95);
-    vec3 violet = vec3(0.70, 0.55, 1.0);
-    vec3 pale = vec3(0.92, 0.90, 0.96);
-    float a = angle + layer * 0.7;
+    // muted bronze on one side, steel blue on the other, a little lavender
+    // between — the original is desaturated and dark, not rainbow
+    vec3 bronze = vec3(0.82, 0.60, 0.34);
+    vec3 steel = vec3(0.46, 0.66, 0.76);
+    vec3 lavender = vec3(0.60, 0.55, 0.72);
+    vec3 pale = vec3(0.88, 0.88, 0.92);
+    float a = angle + layer * 0.35;
     float w1 = 0.5 + 0.5 * sin(a);
-    float w2 = 0.5 + 0.5 * sin(a * 1.7 + 2.1);
-    vec3 col = mix(amber, teal, w1);
-    col = mix(col, violet, w2 * 0.55);
-    return mix(col, pale, 0.18);
+    float w2 = 0.5 + 0.5 * sin(a * 1.3 + 2.1);
+    vec3 col = mix(bronze, steel, w1);
+    col = mix(col, lavender, w2 * 0.35);
+    return mix(col, pale, 0.12);
   }
 
   void main() {
@@ -68,16 +69,17 @@ const FRAG = `
     // a long streak; several layers at different speeds blur them together.
     for (int i = 0; i < 5; i++) {
       float fi = float(i);
-      float flow = uTime * (0.10 + fi * 0.022) + fi * 0.37;
+      float flow = uTime * (0.055 + fi * 0.011) + fi * 0.37;
       float n = fbm(vec2(angle * 26.0 + fi * 2.3, lr * 0.16 - flow * 1.1));
       float fine = fbm(vec2(angle * 62.0 + fi * 5.1, lr * 0.12 - flow * 1.5));
-      float streak = smoothstep(0.38, 0.88, n) * (0.45 + 0.85 * fine);
-      col += tintFor(angle, fi) * streak * 0.34;
+      // a high floor keeps the gaps between streaks properly black
+      float streak = smoothstep(0.46, 0.92, n) * (0.35 + 0.9 * fine);
+      col += tintFor(angle, fi) * streak * 0.30;
     }
 
     // everything falls away toward the edges and blooms at the vanishing point
-    col *= smoothstep(1.25, 0.08, r);
-    col += vec3(1.0, 0.94, 0.88) * 0.09 * exp(-r * r * 9.0);
+    col *= smoothstep(1.3, 0.06, r);
+    col += vec3(1.0, 0.90, 0.78) * 0.13 * exp(-r * r * 11.0);
 
     // sparse stars, thicker away from the center
     vec2 cell = floor(uv * uRes.y * 0.55);
