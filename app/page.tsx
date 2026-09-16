@@ -1,19 +1,12 @@
-import AgenticScene from "./components/AgenticScene";
+import ChapterBlock, {
+  ChapterFeatures,
+  ChapterIntro,
+} from "./components/ChapterBlock";
 import HeroScene from "./components/HeroScene";
 import WaveSections from "./components/WaveSections";
+import { CHAPTERS } from "./data/chapters";
 
-const SECTIONS = [
-  "Agentic",
-  "Sidekick",
-  "Online",
-  "Retail",
-  "Marketing",
-  "Operations",
-  "Shop app",
-  "Payments",
-  "Finance",
-  "Developer",
-];
+const [FIRST_CHAPTER, ...REST_CHAPTERS] = CHAPTERS;
 
 export default function Home() {
   // the bar rides above both sections, the way it stays put on the original
@@ -32,7 +25,10 @@ export default function Home() {
         </a>
       </nav>
       <div className="ml-auto flex items-center gap-5">
-        <a className="hidden transition-opacity hover:opacity-70 sm:block" href="#">
+        <a
+          className="hidden transition-opacity hover:opacity-70 sm:block"
+          href="#"
+        >
           Shopify.com
         </a>
         <a
@@ -57,9 +53,13 @@ export default function Home() {
           150+ updates to sell, shop, and build everywhere
         </p>
         <div className="grid grid-cols-2 gap-x-10 gap-y-2 sm:grid-cols-3">
-          {SECTIONS.map((item) => (
-            <a key={item} className="underline-offset-4 hover:underline" href="#">
-              {item}
+          {CHAPTERS.map((chapter) => (
+            <a
+              key={chapter.id}
+              className="underline-offset-4 hover:underline"
+              href={`#${chapter.id}`}
+            >
+              {chapter.name}
             </a>
           ))}
         </div>
@@ -67,43 +67,54 @@ export default function Home() {
     </section>
   );
 
-  const agentic = (
-    <section
-      id="agentic"
-      className="relative flex h-full w-full flex-col overflow-hidden bg-black"
-      style={{ fontFamily: "var(--font-inter)" }}
-    >
-      <AgenticScene />
-
-      <div className="relative z-10 flex flex-1 flex-col justify-center px-6 text-white sm:px-14">
-        <h2 className="text-[56px] leading-none font-normal tracking-tight sm:text-[76px]">
-          Agentic
-        </h2>
-        <p className="mt-5 max-w-2xl text-lg leading-snug sm:mt-7 sm:text-[26px]">
-          The only platform you need to be in every AI channel
-        </p>
-      </div>
-
-      <div className="relative z-10 flex justify-center pb-8">
-        <button
-          type="button"
-          className="flex items-center gap-8 rounded-full bg-white px-5 py-2.5 text-[13px] font-medium text-black shadow-lg transition-opacity hover:opacity-90"
-        >
-          Agentic
-          <span aria-hidden className="flex flex-col gap-[3px]">
-            <span className="block h-px w-4 bg-black" />
-            <span className="block h-px w-4 bg-black" />
-            <span className="block h-px w-4 bg-black" />
-          </span>
-        </button>
-      </div>
-    </section>
-  );
-
   return (
     <div className="flex flex-1 flex-col bg-[#1b1a22]">
       {topBar}
-      <WaveSections first={hero} second={agentic} />
+
+      {/* the hero gives way to the first chapter through the glass wave */}
+      <WaveSections
+        first={hero}
+        second={<ChapterIntro chapter={FIRST_CHAPTER} />}
+      />
+      <ChapterFeatures chapter={FIRST_CHAPTER} />
+
+      {REST_CHAPTERS.map((chapter) => (
+        <ChapterBlock key={chapter.id} chapter={chapter} />
+      ))}
+
+      <section
+        className="relative bg-black px-6 pt-28 pb-20 text-white sm:px-14"
+        style={{ fontFamily: "var(--font-inter)" }}
+      >
+        <h2 className="max-w-3xl text-[38px] leading-[1.05] font-normal tracking-tight sm:text-[64px]">
+          Get notified about the next edition
+        </h2>
+        <form className="mt-10 flex max-w-xl gap-3" onSubmit={undefined}>
+          <input
+            type="email"
+            placeholder="Email address"
+            className="min-w-0 flex-1 rounded-full border border-white/20 bg-transparent px-5 py-3 text-[15px] placeholder:text-white/40 focus:border-white/60 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-white px-6 py-3 text-[15px] font-medium text-black transition-opacity hover:opacity-90"
+          >
+            Sign up
+          </button>
+        </form>
+
+        <div className="mt-24 grid gap-x-10 gap-y-3 border-t border-white/10 pt-10 text-[13px] text-white/60 sm:grid-cols-3 lg:grid-cols-5">
+          {CHAPTERS.map((chapter) => (
+            <a
+              key={chapter.id}
+              className="hover:text-white"
+              href={`#${chapter.id}`}
+            >
+              {chapter.name}
+            </a>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
