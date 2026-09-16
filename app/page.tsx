@@ -1,3 +1,4 @@
+import AgenticScene from "./components/AgenticScene";
 import HeroScene from "./components/HeroScene";
 
 export default function Home() {
@@ -57,6 +58,37 @@ export default function Home() {
               </a>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section
+        id="agentic"
+        className="relative flex h-[100svh] w-full flex-col overflow-hidden bg-black"
+        style={{ fontFamily: "var(--font-inter)" }}
+      >
+        <AgenticScene />
+
+        <div className="relative z-10 flex flex-1 flex-col justify-center px-6 text-white sm:px-14">
+          <h2 className="text-[56px] font-normal leading-none tracking-tight sm:text-[76px]">
+            Agentic
+          </h2>
+          <p className="mt-5 max-w-2xl text-lg leading-snug sm:mt-7 sm:text-[26px]">
+            The only platform you need to be in every AI channel
+          </p>
+        </div>
+
+        <div className="relative z-10 flex justify-center pb-8">
+          <button
+            type="button"
+            className="flex items-center gap-8 rounded-full bg-white px-5 py-2.5 text-[13px] font-medium text-black shadow-lg transition-opacity hover:opacity-90"
+          >
+            Agentic
+            <span aria-hidden className="flex flex-col gap-[3px]">
+              <span className="block h-px w-4 bg-black" />
+              <span className="block h-px w-4 bg-black" />
+              <span className="block h-px w-4 bg-black" />
+            </span>
+          </button>
         </div>
       </section>
     </div>
