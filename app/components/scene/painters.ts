@@ -440,11 +440,11 @@ const BODIES: Record<PainterId, string> = {
       float gaps = smoothstep(0.0, 0.08, cell.x) * smoothstep(1.0, 0.92, cell.x)
         * smoothstep(0.0, 0.1, cell.y) * smoothstep(1.0, 0.9, cell.y);
       float body = step(0.0, row) * step(row, 7.0) * smoothstep(0.02, -0.02, abs(x) - halfWidth);
-      float streak = 0.7 + 0.3 * noise3(vec3(p.x * 1.5 + loop.x * 0.8, p.y * 50.0, loop.y * 0.8));
-      float shade = 0.6 + 0.4 * hash2(vec2(floor((x + 2.0) / 0.12), row));
+      float streak = 0.85 + 0.15 * noise3(vec3(p.x * 1.5 + loop.x * 0.8, p.y * 50.0, loop.y * 0.8));
+      float shade = 0.8 + 0.2 * hash2(vec2(floor((x + 2.0) / 0.12), row));
       // the top rows catch more light
-      float lift = 0.75 + 0.35 * clamp(row / 7.0, 0.0, 1.0);
-      col = mix(col, vec3(0.86, 0.85, 0.72) * streak * shade * lift, body * (0.35 + 0.65 * gaps));
+      float lift = 0.85 + 0.25 * clamp(row / 7.0, 0.0, 1.0);
+      col = mix(col, vec3(1.0, 0.98, 0.86) * streak * shade * lift, body * (0.45 + 0.55 * gaps));
       col += vec3(0.85, 0.65, 0.25) * exp(-pow((p.y + 0.46) * 35.0, 2.0)) * 0.4
         * smoothstep(0.3, 0.8, noise3(vec3(p.x * 3.0 + loop.x, 7.0 + loop.y, 0.0)));
       return clamp(col, 0.0, 1.0);
