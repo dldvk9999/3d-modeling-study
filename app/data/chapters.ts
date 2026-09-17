@@ -1,8 +1,6 @@
 // The chapters of the original edition, in order, with the copy each one ships.
 // `lead` is the chapter's opening feature; `features` are the cards under it.
 
-import type { SceneVariant } from "../components/chapterVariants";
-
 export type Feature = {
   title: string;
   body: string;
@@ -15,10 +13,6 @@ export type Chapter = {
   tagline: string;
   /** background palette: [warm, cool] */
   palette: [string, string];
-  /** which scene runs behind the chapter; "prism" is the full Agentic pipeline */
-  scene: SceneVariant | "prism";
-  /** rotation for the scenes that take one */
-  tilt?: number;
   lead: Feature;
   features: Feature[];
 };
@@ -29,7 +23,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Agentic",
     tagline: "The only platform you need to be in every AI channel",
     palette: ["#d19a57", "#75a8c2"],
-    scene: "prism",
     lead: {
       title: "Your products optimized for AI",
       body: "Shopify gets your products in AI channels automatically. See how you're performing, track sales, and get guidance on what's missing to drive conversion.",
@@ -93,7 +86,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Sidekick",
     tagline: "Sidekick works with your apps",
     palette: ["#a07fe0", "#5f8fd8"],
-    scene: "aurora",
     lead: {
       title: "Sidekick works with your apps",
       body: "Starting with Judge.me, Klaviyo, Loop, Smile, and more top partners, Sidekick can answer questions about and take action in your apps.",
@@ -147,8 +139,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Online",
     tagline: "Your AI sales associate",
     palette: ["#4fb0a0", "#5f8fd8"],
-    scene: "ribbons",
-    tilt: 0.12,
     lead: {
       title: "Your AI sales associate",
       body: "Help drive sales with an AI assistant on your online store from our messaging tool Shopify Inbox. For customers signed in with Shop, it recommends products based on their history.",
@@ -222,7 +212,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Retail",
     tagline: "Our fastest-ever POS",
     palette: ["#e0894f", "#c2607a"],
-    scene: "cloud",
     lead: {
       title: "Our fastest-ever POS",
       body: "Save over a minute when creating new customers, adding products, and checking out in a cart that's always present. The line never stops, and staff focus on customers.",
@@ -290,8 +279,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Marketing",
     tagline: "Introducing Campaign Autopilot",
     palette: ["#d76f8d", "#8b7fd6"],
-    scene: "ribbons",
-    tilt: 0.55,
     lead: {
       title: "Introducing Campaign Autopilot",
       body: "Run campaigns across channels with AI-powered marketing that learns, optimizes, and drives performance. Set guardrails to stay in control, and track results over time.",
@@ -360,7 +347,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Operations",
     tagline: "More vibe-coding partners",
     palette: ["#c9a25e", "#4f9fc0"],
-    scene: "globe",
     lead: {
       title: "More vibe-coding partners",
       body: "Describe your business and spin up a Shopify store with Manus, Replit, V0, or Lovable.",
@@ -430,7 +416,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Shop app",
     tagline: "Search designed around shoppers",
     palette: ["#7d6fe0", "#4f97d8"],
-    scene: "grid",
     lead: {
       title: "Search designed around shoppers",
       body: "Discover, compare, and research products through conversation. Recommendations are shaped by shoppers' tastes and history on Shop and get smarter over time.",
@@ -483,8 +468,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Payments",
     tagline: "Shop Pay available to any brand on any platform",
     palette: ["#6f7fe0", "#59b3a9"],
-    scene: "ribbons",
-    tilt: -0.25,
     lead: {
       title: "Shop Pay available to any brand on any platform",
       body: "Businesses of all sizes can offer Shop Pay at checkout even if they aren't using Shopify's online store. Get access to 250M+ shoppers and one-click purchasing. Now with simplified onboarding.",
@@ -557,7 +540,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Finance",
     tagline: "Cashback on ad spend from Shopify Balance",
     palette: ["#5fae7a", "#4f9fb0"],
-    scene: "aurora",
     lead: {
       title: "Cashback on ad spend from Shopify Balance",
       body: "Earn cashback on qualifying payments made by ACH or wire transfer from your Shopify Balance account for Meta and Google ads. US only.",
@@ -606,7 +588,6 @@ export const CHAPTERS: Chapter[] = [
     name: "Developer",
     tagline: "Commerce skills for your favorite agent",
     palette: ["#8f8f9e", "#4f97d8"],
-    scene: "grid",
     lead: {
       title: "Commerce skills for your favorite agent",
       body: "Build and manage storefronts, apps, and themes from AI tools like Claude Code, Codex, Cursor, Hermes, and more.",

@@ -1,23 +1,11 @@
-import AgenticScene from "./AgenticScene";
-import ChapterScene from "./ChapterScene";
+import SectionScene from "./SectionScene";
 import WaveSections from "./WaveSections";
 import type { Chapter } from "../data/chapters";
 
 export function ChapterIntro({ chapter }: { chapter: Chapter }) {
-  const [warm, cool] = chapter.palette;
-
   return (
     <section className="relative flex h-full w-full flex-col overflow-hidden bg-black">
-      {chapter.scene === "prism" ? (
-        <AgenticScene />
-      ) : (
-        <ChapterScene
-          warm={warm}
-          cool={cool}
-          variant={chapter.scene}
-          tilt={chapter.tilt ?? 0}
-        />
-      )}
+      <SectionScene section={chapter.id} />
 
       <div className="relative z-10 flex flex-1 flex-col justify-center px-6 text-white sm:px-14">
         <h2 className="text-[56px] leading-none font-normal tracking-tight sm:text-[76px]">
@@ -55,14 +43,12 @@ export function ChapterFeatures({ chapter }: { chapter: Chapter }) {
       style={{ fontFamily: "var(--font-inter)" }}
     >
       {/* on the original the scene stays put while the chapter scrolls over it */}
-      {chapter.scene === "prism" ? (
-        <div
-          aria-hidden
-          className="pointer-events-none sticky top-0 -mb-[100svh] h-[100svh] w-full overflow-hidden"
-        >
-          <AgenticScene />
-        </div>
-      ) : null}
+      <div
+        aria-hidden
+        className="pointer-events-none sticky top-0 -mb-[100svh] h-[100svh] w-full overflow-hidden"
+      >
+        <SectionScene section={chapter.id} />
+      </div>
 
       <div className="relative px-6 py-24 sm:px-14 sm:py-32">
         <div className="flex flex-col gap-10 border-b border-white/10 pb-16 lg:flex-row lg:items-start lg:gap-20">

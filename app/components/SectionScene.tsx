@@ -2,26 +2,38 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { createCardCloud } from "./agentic/cardCloud";
-import { createComposite } from "./agentic/composite";
-import { CAMERA, LIGHT_VOLUME, POINT_CLOUD, POST } from "./agentic/preset";
-import { createPrismVolume } from "./agentic/prismVolume";
+import { createComposite } from "./scene/composite";
+import { createLightVolume } from "./scene/lightVolume";
+import { createPointCloud } from "./scene/pointCloud";
+import { PRESETS } from "./scene/presets";
 import { createFluid } from "./hero/fluid";
 
-// The Agentic backdrop, built the way the original builds it: a raymarched
-// volume of prism light, a point cloud sliding towards the camera, and a post
-// pass with a long afterimage. It appears twice on the page — behind the
-// chapter intro and pinned behind the chapter's content — so everything that
-// moves is driven by the page clock and the page scroll, not by the instance,
-// and the two meet without a seam.
+// A chapter's backdrop, built the way the original builds every chapter: raymarched
+// light volumes, a point cloud, and a post pass with an afterimage, all driven
+// by the chapter's preset. Each chapter shows it twice — behind its intro and
+// pinned behind its content — so whatever moves is driven by a clock shared
+// per chapter and by the page scroll, and the two copies meet without a seam.
 
-const ANCHOR_ID = "agentic";
+const clocks = new Map<string, { time: number; last: number }>();
+
+// one clock per chapter, advanced once per animation frame whichever copy asks
+function chapterTime(section: string, frameTime: number, rate: number) {
+  let clock = clocks.get(section);
+  if (!clock) {
+    clock = { time: frameTime / 1000, last: frameTime };
+    clocks.set(section, clock);
+  }
+  if (frameTime !== clock.last) {
+    clock.time += (Math.min(100, Math.max(0, frameTime - clock.last)) / 1000) * rate;
+    clock.last = frameTime;
+  }
+  return clock.time;
+}
 
 function clamp01(value: number) {
   return Math.min(1, Math.max(0, value));
 }
 
-// the cubic-bezier easing Theatre uses between the two keyframes
 function bezierEase(t: number, [x1, y1, x2, y2]: readonly number[]) {
   const sample = (a: number, b: number, s: number) =>
     3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
@@ -48,20 +60,23 @@ function damp(current: number, target: number, lambda: number, dt: number) {
   return current + (target - current) * (1 - Math.exp(-lambda * dt));
 }
 
-// screens scrolled since the intro finished arriving, shared by both instances
-function screenOffset() {
-  const anchor = document.getElementById(ANCHOR_ID);
+// screens scrolled since the chapter's intro finished arriving
+function screenOffset(section: string) {
+  const anchor = document.getElementById(section);
   if (!anchor) return 0;
   const vh = window.innerHeight || 1;
   return (vh - anchor.getBoundingClientRect().top) / vh;
 }
 
-export default function AgenticScene() {
+const MAIN_SCALE = 0.75;
+
+export default function SectionScene({ section }: { section: string }) {
   const mountRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const mount = mountRef.current;
-    if (!mount) return;
+    const preset = PRESETS[section];
+    if (!mount || !preset) return;
     const el = mount;
 
     // only hold a WebGL context while this copy is anywhere near the screen
@@ -86,13 +101,13 @@ export default function AgenticScene() {
 
     function startScene() {
       const coarse = window.matchMedia("(pointer: coarse)").matches;
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const renderer = new THREE.WebGLRenderer({
         antialias: false,
         alpha: false,
         powerPreference: coarse ? "default" : "high-performance",
       });
-      // the main layer renders below full resolution, like the original's
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * POST.mainScale);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * MAIN_SCALE);
       renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
       renderer.setClearColor(0x000000, 0);
       renderer.autoClear = false;
@@ -101,21 +116,41 @@ export default function AgenticScene() {
       renderer.domElement.style.display = "block";
       el.appendChild(renderer.domElement);
 
-      const camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, 0.01, 100);
+      const { camera: cameraSettings, cloud: cloudSettings, post, behind } = preset;
+      const camera = new THREE.PerspectiveCamera(cameraSettings.fov, 1, 0.01, 200);
       const rig = new THREE.Group();
       rig.add(camera);
 
       const fluid = createFluid(renderer, 128);
-      const prism = createPrismVolume(renderer, coarse ? 56 : LIGHT_VOLUME.raymarchSteps);
-      const cloud = createCardCloud(coarse ? 40000 : POINT_CLOUD.count);
-      const composite = createComposite(renderer);
+      const volumes = preset.volumes.map((settings) =>
+        createLightVolume(renderer, settings, coarse ? 0.6 : 1),
+      );
+      const cloud = createPointCloud(
+        cloudSettings,
+        coarse ? Math.round(cloudSettings.count * 0.4) : cloudSettings.count,
+      );
 
-      const volumeScene = new THREE.Scene();
-      volumeScene.add(prism.group);
+      const layerNormal = (layer: "background" | "foreground") =>
+        preset.volumes.find((v) => v.layer === layer)?.blend === "normal";
+      const composite = createComposite(renderer, {
+        backdrop: preset.backdrop,
+        post,
+        mainScale: MAIN_SCALE,
+        backgroundNormal: layerNormal("background"),
+        pointsNormal: !cloudSettings.transparent || cloudSettings.blend === "normal",
+        foregroundNormal: layerNormal("foreground"),
+      });
+
+      const backgroundScene = new THREE.Scene();
+      const foregroundScene = new THREE.Scene();
+      for (const volume of volumes) {
+        (volume.settings.layer === "background" ? backgroundScene : foregroundScene).add(volume.group);
+      }
       const pointsScene = new THREE.Scene();
       pointsScene.add(cloud.points);
 
-      const volumeResolution = new THREE.Vector2(1, 1);
+      const backgroundResolution = new THREE.Vector2(1, 1);
+      const foregroundResolution = new THREE.Vector2(1, 1);
       const bufferSize = new THREE.Vector2();
       const resize = () => {
         const w = Math.max(1, el.clientWidth);
@@ -123,13 +158,13 @@ export default function AgenticScene() {
         renderer.setSize(w, h, false);
         renderer.getDrawingBufferSize(bufferSize);
         composite.setSize(bufferSize.x, bufferSize.y);
-        volumeResolution.set(composite.volumeTarget.width, composite.volumeTarget.height);
+        backgroundResolution.set(composite.backgroundTarget.width, composite.backgroundTarget.height);
+        foregroundResolution.set(composite.foregroundTarget.width, composite.foregroundTarget.height);
         fluid.setAspect(w / h);
       };
       resize();
       window.addEventListener("resize", resize);
 
-      // pointer: feeds the fluid and orbits the camera round its target
       const pointer = new THREE.Vector2(-10, -10);
       const pointerVel = new THREE.Vector2();
       const pointerNdc = new THREE.Vector2();
@@ -138,15 +173,10 @@ export default function AgenticScene() {
         const rect = el.getBoundingClientRect();
         const x = (event.clientX - rect.left) / rect.width;
         const y = 1 - (event.clientY - rect.top) / rect.height;
-        if (pointerActive) {
-          pointerVel.set((x - pointer.x) * 6.5, (y - pointer.y) * 6.5);
-        }
+        if (pointerActive) pointerVel.set((x - pointer.x) * 6.5, (y - pointer.y) * 6.5);
         pointer.set(x, y);
         // the orbit follows the pointer across the viewport, so both copies agree
-        pointerNdc.set(
-          (event.clientX / window.innerWidth) * 2 - 1,
-          1 - (event.clientY / window.innerHeight) * 2,
-        );
+        pointerNdc.set((event.clientX / window.innerWidth) * 2 - 1, 1 - (event.clientY / window.innerHeight) * 2);
         pointerActive = true;
       };
       const onPointerLeave = () => {
@@ -165,7 +195,6 @@ export default function AgenticScene() {
       );
       onScreen.observe(el);
 
-      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const orbit = { yaw: 0, pitch: 0 };
       const localPosition = new THREE.Vector3();
       const target = new THREE.Vector3();
@@ -175,37 +204,43 @@ export default function AgenticScene() {
       const lookMatrix = new THREE.Matrix4();
       const lookRotation = new THREE.Matrix4();
 
-      const placeCamera = (dt: number) => {
-        const n = reducedMotion ? 0 : screenOffset();
-
-        // Theatre's keyframes lean the rig over the first screens
-        const kf = CAMERA.keyframes;
-        const k = bezierEase(clamp01((n - kf.from) / (kf.to - kf.from)), kf.ease);
+      const placeCamera = (n: number, dt: number) => {
+        const kf = cameraSettings.keyframes;
+        const k = kf ? bezierEase(clamp01((n - kf.from) / (kf.to - kf.from)), kf.ease) : 0;
         rig.position.set(
-          CAMERA.positionOffset[0] + kf.positionOffsetX * k,
-          CAMERA.positionOffset[1],
-          CAMERA.positionOffset[2],
+          cameraSettings.positionOffset[0] + (kf ? kf.positionOffsetX * k : 0),
+          cameraSettings.positionOffset[1],
+          cameraSettings.positionOffset[2],
         );
-        rig.rotation.set(kf.rotationOffsetX * k, kf.rotationOffsetY * k, 0);
+        rig.rotation.set(
+          cameraSettings.rotationOffset[0] + (kf ? kf.rotationOffsetX * k : 0),
+          cameraSettings.rotationOffset[1] + (kf ? kf.rotationOffsetY * k : 0),
+          cameraSettings.rotationOffset[2],
+        );
 
         // scroll drift: slide along the camera's up axis, then dolly
-        localPosition.set(...CAMERA.position);
-        target.set(...CAMERA.target);
+        localPosition.set(...cameraSettings.position);
+        target.set(...cameraSettings.target);
         lookMatrix.lookAt(localPosition, target, camera.up);
         up.set(0, 1, 0).applyMatrix4(lookRotation.extractRotation(lookMatrix));
-        const reach = localPosition.distanceTo(target) * Math.tan(0.2) / CAMERA.scrollDrift.up;
-        localPosition.addScaledVector(up, CAMERA.scrollDrift.up * softLimit(-n, reach));
+        const { up: driftUp, back: driftBack } = cameraSettings.scrollDrift;
+        if (Math.abs(driftUp) > 0.0001) {
+          const reach = (localPosition.distanceTo(target) * Math.tan(0.2)) / Math.abs(driftUp);
+          localPosition.addScaledVector(up, driftUp * softLimit(-n, reach));
+        }
 
         // the pointer orbits the camera round its target
-        const activeLambda = pointerActive ? 6 : 14;
-        const yawGoal = pointerActive && !reducedMotion
-          ? THREE.MathUtils.mapLinear(pointerNdc.x, -1, 1, CAMERA.pointerYaw[0], CAMERA.pointerYaw[1]) * Math.PI / 2
+        const influence = cameraSettings.pointer;
+        const active = pointerActive && !reducedMotion && influence !== null;
+        const yawGoal = active
+          ? THREE.MathUtils.mapLinear(pointerNdc.x, -1, 1, influence.yaw[0], influence.yaw[1]) * (Math.PI / 2)
           : 0;
-        const pitchGoal = pointerActive && !reducedMotion
-          ? THREE.MathUtils.mapLinear(-pointerNdc.y, -1, 1, CAMERA.pointerPitch[0], CAMERA.pointerPitch[1]) * Math.PI / 2
+        const pitchGoal = active
+          ? THREE.MathUtils.mapLinear(-pointerNdc.y, -1, 1, influence.pitch[0], influence.pitch[1]) * (Math.PI / 2)
           : 0;
-        orbit.yaw = damp(orbit.yaw, yawGoal, activeLambda, dt);
-        orbit.pitch = damp(orbit.pitch, pitchGoal, activeLambda, dt);
+        const lambda = active ? 6 : 14;
+        orbit.yaw = damp(orbit.yaw, yawGoal, lambda, dt);
+        orbit.pitch = damp(orbit.pitch, pitchGoal, lambda, dt);
         offset.subVectors(localPosition, target);
         spherical.setFromVector3(offset);
         spherical.theta += orbit.yaw;
@@ -217,9 +252,8 @@ export default function AgenticScene() {
         camera.position.copy(localPosition);
         lookMatrix.lookAt(localPosition, target, camera.up);
         camera.quaternion.setFromRotationMatrix(lookMatrix);
-        camera.translateZ(-n * CAMERA.scrollDrift.back);
+        camera.translateZ(-n * driftBack);
         rig.updateMatrixWorld(true);
-        return n;
       };
 
       // Each copy draws only the slice of one fixed, viewport-sized view that
@@ -231,12 +265,7 @@ export default function AgenticScene() {
         const width = el.clientWidth;
         const height = el.clientHeight;
         const viewportHeight = window.innerHeight || height;
-        if (
-          top !== view.top ||
-          width !== view.width ||
-          height !== view.height ||
-          viewportHeight !== view.viewportHeight
-        ) {
+        if (top !== view.top || width !== view.width || height !== view.height || viewportHeight !== view.viewportHeight) {
           Object.assign(view, { top, width, height, viewportHeight });
           camera.aspect = width / viewportHeight;
           camera.setViewOffset(width, viewportHeight, 0, top, width, height);
@@ -249,57 +278,59 @@ export default function AgenticScene() {
       const startedAt = performance.now();
       let last = startedAt;
       let raf = 0;
-      const tick = () => {
+      const tick = (frameTime: number) => {
         raf = requestAnimationFrame(tick);
         if (!visible) {
-          last = performance.now();
+          last = frameTime;
           lastTop = null;
           return;
         }
-        const now = performance.now();
-        const dt = Math.min(0.1, (now - last) / 1000);
-        last = now;
-        // the page clock, so both copies show the same moment
-        const time = now / 1000;
-        const loadFade = clamp01((now - startedAt) / 1200);
+        const dt = Math.min(0.1, Math.max(0, (frameTime - last) / 1000));
+        last = frameTime;
+        const loadFade = clamp01((performance.now() - startedAt) / 1200);
+
+        const n = reducedMotion ? 0 : screenOffset(section);
+        // with the chapter's content over it, the scene steps back and slows
+        const behindness = THREE.MathUtils.smoothstep(n, 0.25, 0.75);
+        const time = reducedMotion ? 0 : chapterTime(section, frameTime, 1 - behindness * (1 - behind.speed));
 
         fluid.step(dt, pointer, pointerVel);
         pointerVel.multiplyScalar(0.86);
         const screen = frameView();
-        const n = placeCamera(dt);
+        placeCamera(n, dt);
 
-        prism.update({
-          scrubOffset: reducedMotion ? 0 : (time / LIGHT_VOLUME.playbackSeconds) % 1,
-          loadFade,
-          fluid: fluid.texture,
-          resolution: volumeResolution,
-        });
-        cloud.update({
-          time: reducedMotion ? 0 : time,
-          dpr: renderer.getPixelRatio(),
-          loadFade,
-          fluid: fluid.texture,
-        });
+        for (const volume of volumes) {
+          const s = volume.settings;
+          const passes = (time * s.playbackSpeed) / (s.duration ?? 1) + n * s.scrollScrub;
+          volume.update({
+            scrubOffset: ((passes % 1) + 1) % 1,
+            loadFade,
+            fluid: fluid.texture,
+            resolution: s.layer === "background" ? backgroundResolution : foregroundResolution,
+          });
+        }
+        cloud.update({ time, dpr: renderer.getPixelRatio(), loadFade, fluid: fluid.texture });
 
-        renderer.setRenderTarget(composite.volumeTarget);
+        renderer.setRenderTarget(composite.backgroundTarget);
         renderer.clear(true, false, false);
-        renderer.render(volumeScene, camera);
+        renderer.render(backgroundScene, camera);
         renderer.setRenderTarget(composite.pointsTarget);
-        renderer.clear(true, false, false);
+        renderer.clear(true, true, false);
         renderer.render(pointsScene, camera);
+        renderer.setRenderTarget(composite.foregroundTarget);
+        renderer.clear(true, false, false);
+        renderer.render(foregroundScene, camera);
 
-        // once the chapter's content is over it, the scene steps back
-        const behind = THREE.MathUtils.smoothstep(n, 0.1, 0.9);
         composite.render({
           camera,
           time,
           loadFade,
-          behindDarken: POST.behindContent.darken * behind,
-          behindSaturation: 1 - (1 - POST.behindContent.saturation) * behind,
+          behindDarken: behind.darken * behindness,
+          behindSaturation: 1 - (1 - behind.saturation) * behindness,
           screen,
         });
       };
-      tick();
+      raf = requestAnimationFrame(tick);
 
       return () => {
         cancelAnimationFrame(raf);
@@ -307,7 +338,7 @@ export default function AgenticScene() {
         window.removeEventListener("resize", resize);
         window.removeEventListener("pointermove", onPointerMove);
         document.documentElement.removeEventListener("pointerleave", onPointerLeave);
-        prism.dispose();
+        for (const volume of volumes) volume.dispose();
         cloud.dispose();
         composite.dispose();
         fluid.dispose();
@@ -315,7 +346,7 @@ export default function AgenticScene() {
         if (renderer.domElement.parentNode === el) el.removeChild(renderer.domElement);
       };
     }
-  }, []);
+  }, [section]);
 
   return <div ref={mountRef} className="absolute inset-0 h-full w-full" />;
 }
