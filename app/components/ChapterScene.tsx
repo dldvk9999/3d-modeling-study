@@ -4,9 +4,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { fragmentFor, type SceneVariant } from "./chapterVariants";
 
-// A warp tunnel: colored light streaks pulled out of the center and flying past
-// the viewer. The streaking comes from sampling noise in (angle, log radius)
-// space, which stretches every feature along the radial direction.
+// A full-screen quad running one of the procedural chapter backdrops.
 const VERT = `
   void main() {
     gl_Position = vec4(position.xy, 0.0, 1.0);
@@ -16,7 +14,7 @@ const VERT = `
 export default function ChapterScene({
   warm = "#d19a57",
   cool = "#75a8c2",
-  variant = "warp",
+  variant = "aurora",
   tilt = 0,
 }: {
   variant?: SceneVariant;

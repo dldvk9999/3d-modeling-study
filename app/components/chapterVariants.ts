@@ -4,7 +4,6 @@
 // the same subject and the same dark, glowing look.
 
 export type SceneVariant =
-  | "warp" // light streaks flying out of the vanishing point
   | "aurora" // standing columns of light, breathing
   | "ribbons" // long bands of light flowing sideways
   | "globe" // a dotted sphere, turning
@@ -65,28 +64,6 @@ const PRELUDE = `
 `;
 
 const BODIES: Record<SceneVariant, string> = {
-  // light streaks pulled out of a vanishing point — high angular frequency and
-  // a low radial one stretches every feature into a long streak
-  warp: `
-    vec2 d = uv - uCenter;
-    float r = length(d);
-    float angle = atan(d.y, d.x);
-    float lr = log(r + 0.05);
-
-    for (int i = 0; i < 5; i++) {
-      float fi = float(i);
-      float flow = uTime * (0.055 + fi * 0.011) + fi * 0.37;
-      float n = fbm(vec2(angle * 26.0 + fi * 2.3, lr * 0.16 - flow * 1.1));
-      float fine = fbm(vec2(angle * 62.0 + fi * 5.1, lr * 0.12 - flow * 1.5));
-      float streak = smoothstep(0.46, 0.92, n) * (0.35 + 0.9 * fine);
-      col += tint(angle + fi * 0.35) * streak * 0.30;
-    }
-
-    col *= smoothstep(1.3, 0.06, r);
-    col += vec3(1.0, 0.90, 0.78) * 0.13 * exp(-r * r * 11.0);
-    col += stars(uv, 0.9977, smoothstep(0.08, 0.8, r));
-  `,
-
   // columns of light standing on the horizon, swaying and breathing
   aurora: `
     vec2 p = uv - vec2(uCenter.x * 0.5, 0.0);

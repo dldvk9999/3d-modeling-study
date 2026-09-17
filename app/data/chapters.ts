@@ -15,8 +15,8 @@ export type Chapter = {
   tagline: string;
   /** background palette: [warm, cool] */
   palette: [string, string];
-  /** which procedural scene runs behind the chapter */
-  scene: SceneVariant;
+  /** which scene runs behind the chapter; "prism" is the full Agentic pipeline */
+  scene: SceneVariant | "prism";
   /** rotation for the scenes that take one */
   tilt?: number;
   lead: Feature;
@@ -29,7 +29,7 @@ export const CHAPTERS: Chapter[] = [
     name: "Agentic",
     tagline: "The only platform you need to be in every AI channel",
     palette: ["#d19a57", "#75a8c2"],
-    scene: "warp",
+    scene: "prism",
     lead: {
       title: "Your products optimized for AI",
       body: "Shopify gets your products in AI channels automatically. See how you're performing, track sales, and get guidance on what's missing to drive conversion.",

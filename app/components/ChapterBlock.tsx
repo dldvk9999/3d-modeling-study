@@ -1,3 +1,4 @@
+import AgenticScene from "./AgenticScene";
 import ChapterScene from "./ChapterScene";
 import WaveSections from "./WaveSections";
 import type { Chapter } from "../data/chapters";
@@ -7,12 +8,16 @@ export function ChapterIntro({ chapter }: { chapter: Chapter }) {
 
   return (
     <section className="relative flex h-full w-full flex-col overflow-hidden bg-black">
-      <ChapterScene
-        warm={warm}
-        cool={cool}
-        variant={chapter.scene}
-        tilt={chapter.tilt ?? 0}
-      />
+      {chapter.scene === "prism" ? (
+        <AgenticScene />
+      ) : (
+        <ChapterScene
+          warm={warm}
+          cool={cool}
+          variant={chapter.scene}
+          tilt={chapter.tilt ?? 0}
+        />
+      )}
 
       <div className="relative z-10 flex flex-1 flex-col justify-center px-6 text-white sm:px-14">
         <h2 className="text-[56px] leading-none font-normal tracking-tight sm:text-[76px]">
@@ -46,61 +51,73 @@ export function ChapterFeatures({ chapter }: { chapter: Chapter }) {
   return (
     <section
       id={chapter.id}
-      className="relative bg-black px-6 py-24 text-white sm:px-14 sm:py-32"
+      className="relative bg-black text-white"
       style={{ fontFamily: "var(--font-inter)" }}
     >
-      <div className="flex flex-col gap-10 border-b border-white/10 pb-16 lg:flex-row lg:items-start lg:gap-20">
-        <h3 className="max-w-xl text-[34px] leading-[1.1] font-normal tracking-tight sm:text-[46px]">
-          {chapter.lead.title}
-        </h3>
-        <div className="max-w-md lg:pt-3">
-          <p className="text-[15px] leading-relaxed text-white/70">
-            {chapter.lead.body}
-          </p>
-          {chapter.lead.cta ? (
-            <a
-              className="mt-4 inline-block border-b border-white/40 pb-0.5 text-[15px] hover:border-white"
-              href="#"
-            >
-              {chapter.lead.cta}
-            </a>
-          ) : null}
+      {/* on the original the scene stays put while the chapter scrolls over it */}
+      {chapter.scene === "prism" ? (
+        <div
+          aria-hidden
+          className="pointer-events-none sticky top-0 -mb-[100svh] h-[100svh] w-full overflow-hidden"
+        >
+          <AgenticScene />
         </div>
-      </div>
+      ) : null}
 
-      {/* stands in for the product shot the original runs under each lead */}
-      <div
-        className="mt-16 h-[38svh] w-full rounded-2xl border border-white/10 sm:h-[52svh]"
-        style={{
-          background: `radial-gradient(120% 90% at 20% 15%, ${warm}2e, transparent 60%), radial-gradient(120% 90% at 85% 80%, ${cool}33, transparent 62%), #0b0b0f`,
-        }}
-      />
-
-      <div className="mt-20 grid gap-x-12 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
-        {chapter.features.map((feature) => (
-          <article key={feature.title} className="flex flex-col">
-            <div
-              className="mb-5 h-40 w-full rounded-xl border border-white/10"
-              style={{
-                background: `linear-gradient(145deg, ${warm}26, transparent 55%), linear-gradient(315deg, ${cool}2b, transparent 55%), #101016`,
-              }}
-            />
-            <h4 className="text-[17px] leading-snug font-medium">
-              {feature.title}
-            </h4>
-            <p className="mt-2 text-[14px] leading-relaxed text-white/60">
-              {feature.body}
+      <div className="relative px-6 py-24 sm:px-14 sm:py-32">
+        <div className="flex flex-col gap-10 border-b border-white/10 pb-16 lg:flex-row lg:items-start lg:gap-20">
+          <h3 className="max-w-xl text-[34px] leading-[1.1] font-normal tracking-tight sm:text-[46px]">
+            {chapter.lead.title}
+          </h3>
+          <div className="max-w-md lg:pt-3">
+            <p className="text-[15px] leading-relaxed text-white/70">
+              {chapter.lead.body}
             </p>
-            {feature.cta ? (
+            {chapter.lead.cta ? (
               <a
-                className="mt-3 self-start border-b border-white/30 pb-0.5 text-[14px] text-white/80 hover:border-white hover:text-white"
+                className="mt-4 inline-block border-b border-white/40 pb-0.5 text-[15px] hover:border-white"
                 href="#"
               >
-                {feature.cta}
+                {chapter.lead.cta}
               </a>
             ) : null}
-          </article>
-        ))}
+          </div>
+        </div>
+
+        {/* stands in for the product shot the original runs under each lead */}
+        <div
+          className="mt-16 h-[38svh] w-full rounded-2xl border border-white/10 sm:h-[52svh]"
+          style={{
+            background: `radial-gradient(120% 90% at 20% 15%, ${warm}2e, transparent 60%), radial-gradient(120% 90% at 85% 80%, ${cool}33, transparent 62%), #0b0b0f`,
+          }}
+        />
+
+        <div className="mt-20 grid gap-x-12 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
+          {chapter.features.map((feature) => (
+            <article key={feature.title} className="flex flex-col">
+              <div
+                className="mb-5 h-40 w-full rounded-xl border border-white/10"
+                style={{
+                  background: `linear-gradient(145deg, ${warm}26, transparent 55%), linear-gradient(315deg, ${cool}2b, transparent 55%), #101016`,
+                }}
+              />
+              <h4 className="text-[17px] leading-snug font-medium">
+                {feature.title}
+              </h4>
+              <p className="mt-2 text-[14px] leading-relaxed text-white/60">
+                {feature.body}
+              </p>
+              {feature.cta ? (
+                <a
+                  className="mt-3 self-start border-b border-white/30 pb-0.5 text-[14px] text-white/80 hover:border-white hover:text-white"
+                  href="#"
+                >
+                  {feature.cta}
+                </a>
+              ) : null}
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );
