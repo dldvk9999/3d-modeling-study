@@ -295,64 +295,111 @@ function buildForest(count: number, rand: () => number) {
   return out;
 }
 
-// A long glass store under a roof slab, lit warm from inside.
+// A glass-walled store on a plaza, seen at its corner: two glass fronts run
+// away from the corner nearest the viewer, the goods on display crowd just
+// behind the glass, and a flat roof slab overhangs it all. Laid out in the
+// capture's own units, from plan and elevation measurements of the original.
 function buildStorefront(count: number, rand: () => number) {
   const out = new Writer(count);
-  const ground = -0.15;
-  // the store stands back from the plaza the viewer is on
-  const box = { x0: -0.62, x1: 0.38, y1: 0.24, z0: -1.55, z1: -0.72 };
-  // pin the capture's bounds so the loader fits it the same way
+  // the capture's bounds, held by two unlit strays so the loader fits the same
   out.push(-0.81, -0.15, -1.81, 0, 0, 0);
   out.push(0.54, 0.29, -0.3, 0, 0, 0);
+
+  const ground = -0.14;
+  const eaves = 0.13;
+  const corner = [-0.221, -0.807];
+  // the two fronts: one runs back to the left, one back to the right
+  const sideA = [-0.21, -0.5];
+  const sideB = [0.71, -0.35];
+  const at = (s: number, t: number): [number, number] => [
+    corner[0] + sideA[0] * s + sideB[0] * t,
+    corner[1] + sideA[1] * s + sideB[1] * t,
+  ];
+  const lengthA = Math.hypot(sideA[0], sideA[1]);
+  const lengthB = Math.hypot(sideB[0], sideB[1]);
+
+  // what's on display: warm fabric, soft teal and pink, dark shelving
+  const goods = (x: number, y: number, z: number): [number, number, number] => {
+    const n = fbm3(x * 9, y * 9, z * 9);
+    const m = fbm3(x * 5 + 7, y * 5, z * 5 + 3);
+    if (n < 0.4) return [0.28, 0.23, 0.2];
+    if (m > 0.62) return [0.42, 0.52, 0.47];
+    if (m < 0.34) return [0.7, 0.46, 0.46];
+    return [0.72, 0.46 + n * 0.16, 0.3 + n * 0.12];
+  };
+
   while (!out.full) {
     const roll = rand();
-    if (roll < 0.22) {
-      const x = -0.81 + rand() * 1.35;
-      const z = -1.81 + rand() * 1.51;
-      const shade = 0.55 + fbm3(x * 8, 0, z * 8) * 0.3;
-      out.push(x, ground, z, 0.3 * shade + 0.04, 0.27 * shade + 0.04, 0.32 * shade + 0.05);
-    } else if (roll < 0.62) {
-      // glass walls: warm interior showing between mullions
-      const side = Math.floor(rand() * 3);
-      const y = ground + rand() * (box.y1 - ground);
+    const jitter = () => (rand() - 0.5) * 0.012;
+    if (roll < 0.42) {
+      // the display crowding each glass front, a little way inside it
+      const y = ground + 0.03 + rand() * (eaves - ground - 0.04);
       let x: number;
       let z: number;
-      let along: number;
-      if (side === 0) {
-        x = box.x0 + rand() * (box.x1 - box.x0);
-        z = box.z1;
-        along = x;
-      } else if (side === 1) {
-        x = box.x1;
-        z = box.z0 + rand() * (box.z1 - box.z0);
-        along = z;
+      if (rand() < 0.45) {
+        const s = 0.1 + rand() * 0.1;
+        [x, z] = at(s, rand());
       } else {
-        x = box.x0;
-        z = box.z0 + rand() * (box.z1 - box.z0);
-        along = z;
+        const t = rand() * 0.09;
+        [x, z] = at(rand(), t);
       }
-      const mullion = Math.abs(((along * 9) % 1) - 0.5) > 0.44;
-      const glow = fbm3(x * 6, y * 6, z * 6);
-      if (mullion) out.push(x, y, z, 0.55, 0.5, 0.42);
-      else if (glow > 0.55) out.push(x, y, z, 0.48, 0.64, 0.58);
-      else out.push(x, y, z, 0.88, 0.45 + glow * 0.2, 0.26 + glow * 0.15);
-    } else if (roll < 0.8) {
-      // the roof slab overhanging all round
-      const x = box.x0 - 0.16 + rand() * (box.x1 - box.x0 + 0.32);
-      const z = box.z0 - 0.16 + rand() * (box.z1 - box.z0 + 0.32);
-      const y = box.y1 + rand() * 0.04;
-      out.push(x, y, z, 0.22, 0.23, 0.2);
-    } else if (roll < 0.93) {
-      // the warm room inside
-      const x = box.x0 + rand() * (box.x1 - box.x0);
-      const y = ground + rand() * (box.y1 - ground) * 0.8;
-      const z = box.z0 + rand() * (box.z1 - box.z0);
-      out.push(x, y, z, 0.85, 0.45, 0.25);
-    } else {
-      // a tree by the corner
+      x += jitter();
+      z += jitter();
+      const shade = 0.85 + rand() * 0.2;
+      const [r, g, b] = goods(x, y, z);
+      out.push(x, y, z, r * shade, g * shade, b * shade);
+    } else if (roll < 0.47) {
+      // mullions and the glass itself, along both fronts
+      const onA = rand() < lengthA / (lengthA + lengthB);
+      const along = rand();
+      const y = ground + rand() * (eaves - ground);
+      const [x, z] = onA ? at(along, 0) : at(0, along);
+      const spacing = onA ? 0.08 / lengthA : 0.08 / lengthB;
+      const mullion = Math.abs(((along / spacing) % 1) - 0.5) > 0.4;
+      if (mullion) out.push(x, y, z, 0.8, 0.74, 0.62);
+      else out.push(x, y, z, 0.34, 0.33, 0.27);
+    } else if (roll < 0.6) {
+      // the roof slab, overhanging the fronts, lighter on top than beneath
+      const s = -0.1 + rand() * 1.15;
+      const t = -0.08 + rand() * 1.13;
+      const [x, z] = at(s, t);
+      const top = rand() < 0.3;
+      const y = top ? eaves + 0.02 + rand() * 0.012 : eaves + rand() * 0.02;
+      const shade = 0.9 + fbm3(x * 12, 0, z * 12) * 0.2;
+      if (top) out.push(x, y, z, 0.5 * shade, 0.49 * shade, 0.43 * shade);
+      else out.push(x, y, z, 0.42 * shade, 0.41 * shade, 0.34 * shade);
+    } else if (roll < 0.64) {
+      // the floor inside
+      const [x, z] = at(rand(), rand());
+      out.push(x, ground + rand() * 0.02, z, 0.41, 0.35, 0.3);
+    } else if (roll < 0.82) {
+      // the plaza, everywhere the store isn't
+      const x = -0.8 + rand() * 1.34;
+      const z = -1.8 + rand() * 1.5;
+      const dx = x - corner[0];
+      const dz = z - corner[1];
+      const s = (dx * sideA[0] + dz * sideA[1]) / (lengthA * lengthA);
+      const t = (dx * sideB[0] + dz * sideB[1]) / (lengthB * lengthB);
+      if (s > 0 && t > 0 && s < 1 && t < 1) continue;
+      const shade = 0.85 + fbm3(x * 10, 0, z * 10) * 0.3;
+      out.push(x, ground - rand() * 0.01, z, 0.4 * shade, 0.37 * shade, 0.36 * shade);
+    } else if (roll < 0.86) {
+      // a bench out front
+      const u = rand();
+      const x = -0.005 + u * 0.075 + jitter();
+      const z = -0.455 + u * 0.15 + jitter();
+      out.push(x, -0.085 + rand() * 0.015, z, 0.84, 0.8, 0.72);
+    } else if (roll < 0.9) {
+      // a flowering shrub against the far corner
       const u = rand() * Math.PI * 2;
-      const r = 0.12 * Math.cbrt(rand());
-      out.push(-0.62 + Math.cos(u) * r, 0.18 + (rand() - 0.5) * 0.2, -0.32 + Math.sin(u) * r, 0.34, 0.45, 0.32);
+      const r = 0.1 * Math.cbrt(rand());
+      out.push(-0.44 + Math.cos(u) * r, ground + rand() * 0.3, -1.56 + Math.sin(u) * r * 0.6, 0.76, 0.42, 0.48);
+    } else {
+      // dust in the air around the store, catching its colours
+      const x = -0.8 + rand() * 1.34;
+      const y = ground + rand() * (eaves - ground + 0.05);
+      const z = -1.8 + rand() * 1.5;
+      out.push(x, y, z, 0.48, 0.4, 0.36);
     }
   }
   return out;

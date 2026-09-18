@@ -132,6 +132,9 @@ export type CameraSettings = {
 };
 
 export type SectionPreset = {
+  /** how the layers are composited: "display" as the original does, "linear"
+   *  for Agentic, whose stand-ins were tuned that way */
+  space: "display" | "linear";
   camera: CameraSettings;
   backdrop: Backdrop;
   cloud: CloudSettings;
@@ -144,6 +147,7 @@ const noGrid = { enabled: false, size: 1, strength: 0, mix: [0, 0, 0] as Vec3, r
 
 export const PRESETS: Record<string, SectionPreset> = {
   agentic: {
+    space: "linear",
     camera: {
       position: [-0.012337694942119056, 0.07944265448797339, -0.44905051315225064],
       target: [0.2057636663094521, -0.0705398556730998, 0.5073804838572582],
@@ -224,6 +228,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   sidekick: {
+    space: "display",
     camera: {
       position: [-0.065, -0.838, 1.385],
       target: [-0.763, -0.698, 0.086],
@@ -317,6 +322,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   online: {
+    space: "display",
     camera: {
       position: [-0.043, -0.246, 0.52],
       target: [-0.085, -0.161, 0.015],
@@ -420,6 +426,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   retail: {
+    space: "display",
     camera: {
       position: [-0.484, -0.689, 0.884],
       target: [-0.281, -0.672, 0.421],
@@ -441,7 +448,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     },
     cloud: {
       builder: "storefront",
-      count: 120000,
+      count: 65536,
       position: [0, -0.593, 0.1],
       rotationDeg: [0, -9.9, 0],
       scale: 0.44,
@@ -486,7 +493,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         hsl: [0.01, -0.26, 0],
       },
       {
-        painter: "prismPlain",
+        painter: "rays",
         aspect: 427 / 240,
         layer: "foreground",
         blend: "additive",
@@ -522,6 +529,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   marketing: {
+    space: "display",
     camera: {
       position: [0.534, 0.23, -0.653],
       target: [0.052, 0.307, 1.482],
@@ -592,6 +600,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   operations: {
+    space: "display",
     camera: {
       position: [-1.721, -0.03, -0.369],
       target: [-0.335, -0.008, -0.396],
@@ -670,6 +679,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   "shop-app": {
+    space: "display",
     camera: {
       position: [-0.126, 0.384, 1.864],
       target: [-0.126, 0.369, -0.056],
@@ -739,6 +749,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   payments: {
+    space: "display",
     camera: {
       position: [-0.597, -0.443, 0.532],
       target: [-0.685, -0.397, -0.35],
@@ -832,6 +843,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   finance: {
+    space: "display",
     camera: {
       position: [-0.305, 0.025, 0.909],
       target: [-0.349, 0.029, -0.543],
@@ -910,6 +922,7 @@ export const PRESETS: Record<string, SectionPreset> = {
   },
 
   developer: {
+    space: "display",
     camera: {
       position: [0.376, -0.053, 0.809],
       target: [0.11, -0.019, -0.168],

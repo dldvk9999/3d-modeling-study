@@ -4,6 +4,11 @@
 // trails but not the background light; the foreground light layer on top;
 // grain and a vignette; then the chapter's gradient backdrop showing through
 // wherever the scene is empty, the "behind content" tune-down, tone mapping.
+//
+// Like the original, the scene's values are composited as display (sRGB)
+// values and only decoded to linear for tone mapping, which is what gives it
+// its deep blacks and saturated light. Agentic keeps the linear composite its
+// stand-ins were tuned against.
 
 import * as THREE from "three";
 import type { Backdrop, PostSettings } from "./presets";
@@ -176,8 +181,14 @@ const OUTPUT_FRAG = `
   uniform float uLoadFade;
   uniform float uBehindDarken;
   uniform float uBehindSaturation;
+  uniform float uDisplayReferred;
 
   ${THREE.ShaderChunk.tonemapping_pars_fragment}
+
+  vec3 sRGBToLinear(vec3 c) {
+    c = max(c, vec3(0.0));
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+  }
 
   vec3 linearToSRGB(vec3 c) {
     c = max(c, vec3(0.0));
@@ -236,12 +247,20 @@ const OUTPUT_FRAG = `
     if (uGradient > 0.5) {
       vec3 gradient = gradientColor(screenUv) * (1.0 - clamp(uGradientDarken, 0.0, 1.0));
       gradient *= mix(0.05, 1.0, clamp(uLoadFade, 0.0, 1.0));
-      color = mix(pow(gradient, vec3(2.2)), color, clamp(alpha, 0.0, 1.0));
+      vec3 background = uDisplayReferred > 0.5 ? gradient : pow(gradient, vec3(2.2));
+      color = mix(background, color, clamp(alpha, 0.0, 1.0));
     }
 
-    color = NeutralToneMapping(max(color, vec3(0.0)));
-    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    color = mix(vec3(luma), color, uBehindSaturation) * (1.0 - uBehindDarken);
+    if (uDisplayReferred > 0.5) {
+      // the tune-down happens on the display values, then decode and tone map
+      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      color = mix(vec3(luma), color, uBehindSaturation) * (1.0 - uBehindDarken);
+      color = NeutralToneMapping(sRGBToLinear(color));
+    } else {
+      color = NeutralToneMapping(max(color, vec3(0.0)));
+      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+      color = mix(vec3(luma), color, uBehindSaturation) * (1.0 - uBehindDarken);
+    }
     gl_FragColor = vec4(linearToSRGB(color), 1.0);
   }
 `;
@@ -305,6 +324,7 @@ export function createComposite(
     backgroundNormal: boolean;
     pointsNormal: boolean;
     foregroundNormal: boolean;
+    displayReferred: boolean;
   },
 ): Composite {
   const { backdrop, post } = options;
@@ -397,6 +417,7 @@ export function createComposite(
     uLoadFade: { value: 0 },
     uBehindDarken: { value: 0 },
     uBehindSaturation: { value: 1 },
+    uDisplayReferred: { value: options.displayReferred ? 1 : 0 },
   });
 
   const clearTrails = () => {

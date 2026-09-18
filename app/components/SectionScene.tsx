@@ -139,6 +139,7 @@ export default function SectionScene({ section }: { section: string }) {
         backgroundNormal: layerNormal("background"),
         pointsNormal: !cloudSettings.transparent || cloudSettings.blend === "normal",
         foregroundNormal: layerNormal("foreground"),
+        displayReferred: preset.space === "display",
       });
 
       const backgroundScene = new THREE.Scene();

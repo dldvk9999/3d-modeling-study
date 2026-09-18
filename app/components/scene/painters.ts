@@ -1,7 +1,9 @@
 // Every chapter of the original raymarches one or two short clips stacked
 // into 3D textures (see lightVolume.ts). The clips are Shopify's footage, so
 // each one is stood in for by a shader that paints the same subject, frame by
-// frame, into the texture: a spinning globe, a ring of coins, the Shop swirl.
+// frame, into the texture: a voice waveform, a ring of coins, a glass store.
+// Each was drawn against the original clip's frames and its time-average,
+// since the camera mostly looks down the clip's time axis.
 //
 // A painter is `vec3 paint(vec2 uv, float phase, float aspect)`: uv is the
 // frame, phase runs 0..1 around a closed loop (the texture wraps in depth, so
@@ -9,20 +11,20 @@
 
 export type PainterId =
   | "prism" // rainbow sheets of light out of a white hot spot (Agentic)
-  | "prismPlain" // the same light without the Agentic colour push (Retail foreground)
-  | "stripes" // a voice waveform of pastel bars over dust (Sidekick voice)
-  | "pills" // small glowing UI pills drifting past (Sidekick artifacts)
-  | "coins" // a ring of pastel coins turning (Online)
+  | "stripes" // a diamond of pulsing pastel voice bars (Sidekick voice)
+  | "pills" // a glowing Sidekick UI pill on a dim panel (Sidekick artifacts)
+  | "coins" // a ring of pale pastel coins turning (Online)
   | "phone" // a phone screen with a photo card sliding up (Online foreground)
-  | "storefront" // a warm painted glass storefront (Retail)
-  | "collage" // product photos and cards sliding over black (Marketing)
-  | "tiles" // bright photo tiles growing out of black (Developer foreground)
+  | "storefront" // a glass pavilion at dusk (Retail)
+  | "rays" // rainbow light pouring out of a white-hot centre (Retail foreground)
+  | "collage" // product and lifestyle photos coming and going (Marketing)
   | "globe" // the Earth, turning (Operations)
   | "swirl" // the Shop swirl, winding in (Shop app)
-  | "cards" // payment cards flying past at a steep angle (Payments)
-  | "vortex" // iridescent rays round a rainbow hole (Payments foreground)
-  | "bars" // a stepped block skyline, motion blurred (Finance)
-  | "screens"; // drifting panels of a dark website (Developer)
+  | "cards" // teal payment cards stacking up (Payments)
+  | "vortex" // an iridescent ring with light streaming off it (Payments foreground)
+  | "bars" // a stepped pyramid of glowing blocks (Finance)
+  | "screens" // a grid of dark site screenshots and code (Developer)
+  | "tiles"; // a grid of photos switching shots (Developer foreground)
 
 export const PAINTER_PRELUDE = `
   precision highp float;
@@ -168,98 +170,100 @@ const BODIES: Record<PainterId, string> = {
     }
   `,
 
-  prismPlain: `
-    ${PRISM_CORE}
-    vec3 paint(vec2 uv, float phase, float aspect) {
-      return prismLight(uv, phase, aspect);
-    }
-  `,
-
-  // a voice waveform: rows of thin pastel bars pulsing up and down, with
-  // groups of loud bars travelling across the frame
+  // Sidekick's voice: a diamond of rounded pastel bars pulsing like a
+  // waveform, over near-black with glittering dust low on the left
   stripes: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-      vec3 col = vec3(0.015, 0.014, 0.02);
-      // a dim haze shelf low in the frame
-      col += vec3(0.03, 0.035, 0.07) * smoothstep(0.08, -0.08, p.y + 0.26 + 0.05 * sin(TAU * phase));
-      col += vec3(0.8, 0.75, 0.9) * step(0.992, hash2(floor(uv * vec2(aspect, 1.0) * 150.0))) * 0.6;
+      vec3 col = vec3(0.02, 0.02, 0.035) + vec3(0.05, 0.045, 0.08) * exp(-dot(p, p) * 3.0);
+      vec2 cell = floor(uv * vec2(aspect, 1.0) * 110.0);
+      float dust = step(0.975, hash2(cell + floor(phase * 10.0) * 7.0))
+        * smoothstep(0.6, 0.15, uv.y) * smoothstep(0.75, 0.25, uv.x);
+      col += vec3(0.85, 0.75, 1.0) * dust * 0.9;
 
-      float coord = (p.x + aspect * 0.5) / (aspect / 72.0);
-      float id = floor(coord);
-      float bar = smoothstep(0.5, 0.28, abs(fract(coord) - 0.5));
-
-      // loud groups travel across and out of frame, both ways
-      float envelope = 0.0;
-      for (int g = 0; g < 3; g++) {
-        float fg = float(g);
-        float direction = mod(fg, 2.0) < 0.5 ? 1.0 : -1.0;
-        float travel = aspect + 1.2;
-        float centre = (fract(hash1(fg * 4.3) + phase * direction) - 0.5) * travel;
-        envelope = max(envelope, smoothstep(0.38, 0.0, abs(p.x - centre)));
+      float spacing = 0.07;
+      float index = floor(p.x / spacing + 0.5);
+      if (abs(index) <= 5.0) {
+        float x = p.x - index * spacing;
+        float envelope = 1.0 - abs(index) / 6.0;
+        float pulse = 0.6 + 0.4 * sin(TAU * (phase * 2.0 + hash1(index * 3.7 + 1.0)));
+        float halfHeight = 0.34 * envelope * pulse + 0.015;
+        vec2 q = vec2(x, max(abs(p.y) - halfHeight, 0.0));
+        float d = length(q) - 0.024;
+        float bar = smoothstep(0.004, -0.004, d);
+        float glow = exp(-max(d, 0.0) * 40.0) * 0.25;
+        // each bar runs between two pastels, bottom to top
+        float pick = hash1(index * 1.7 + 4.0);
+        vec3 lilac = vec3(0.7, 0.46, 1.0);
+        vec3 pink = vec3(1.0, 0.55, 0.8);
+        vec3 cream = vec3(1.0, 0.78, 0.6);
+        vec3 sky = vec3(0.55, 0.72, 1.0);
+        vec3 top = pick < 0.3 ? pink : pick < 0.6 ? lilac : pick < 0.8 ? cream : sky;
+        vec3 bottom = pick < 0.3 ? cream : pick < 0.6 ? pink : pick < 0.8 ? sky : lilac;
+        float t = clamp(p.y / max(halfHeight, 0.001) * 0.5 + 0.5, 0.0, 1.0);
+        vec3 tone = mix(bottom, top, t);
+        col = mix(col, tone, bar) + tone * glow * (1.0 - bar);
       }
-      float height = envelope * (0.12 + 0.3 * hash1(id * 1.7)) * (0.6 + 0.4 * sin(TAU * (phase * 2.0 + hash1(id * 3.1))));
-      float inBar = smoothstep(height, height - 0.02, abs(p.y - 0.05)) * step(0.005, height);
-      // lavender and pink, with the odd peach or mint bar
-      vec3 pastel = 0.72 + 0.26 * cos(TAU * (vec3(0.0, 0.2, 0.45) + hash1(id * 1.7) * 0.5 + 0.55));
-      pastel = mix(pastel, vec3(0.72, 0.55, 1.0), 0.7);
-      return mix(col, pastel, bar * inBar);
+      return col;
     }
   `,
 
+  // one Sidekick UI pill, glowing purple, resting on a dim grey panel
   pills: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-      vec3 col = vec3(0.0);
-      for (int i = 0; i < 5; i++) {
+      vec3 col = vec3(0.1) * step(uv.x, 0.55);
+      vec2 loop = loopVec(phase);
+      vec2 centre = vec2((0.37 - 0.5) * aspect, 0.0) + vec2(0.012 * loop.x, 0.02 * loop.y);
+      float scale = 0.7 + 0.3 * (0.5 + 0.5 * sin(TAU * phase));
+      vec2 q = (p - centre) / scale;
+      float d = sdRoundBox(q, vec2(0.15, 0.032), 0.032);
+      float body = fill(d);
+      col = mix(col, vec3(0.07, 0.06, 0.1), body);
+      col += vec3(0.5, 0.3, 1.0) * exp(-abs(d) * 110.0) * 1.1;
+      for (int i = 0; i < 3; i++) {
         float fi = float(i);
-        vec2 c = vec2((hash1(fi * 2.3) - 0.5) * aspect * 0.8, (fract(hash1(fi * 5.1) + phase) - 0.5) * 1.8);
-        vec2 q = p - c;
-        float size = 0.08 + 0.06 * hash1(fi * 9.7);
-        float d = sdRoundBox(q, vec2(size, size * 0.28), size * 0.28);
-        float body = fill(d);
-        float rim = smoothstep(0.012, 0.0, abs(d));
-        col += vec3(0.1, 0.08, 0.14) * body + vec3(0.55, 0.35, 1.0) * rim * 0.9;
-        col += vec3(0.9) * smoothstep(0.02, 0.012, length(q - vec2(-size * 0.5, 0.0))) * body;
+        vec2 icon = vec2(-0.09 + fi * 0.075, 0.0);
+        col += vec3(0.92) * smoothstep(0.014, 0.009, length(q - icon)) * body;
       }
       return col;
     }
   `,
 
+  // a ring of pale pastel coins, turning once per loop, with a gap in it
   coins: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-      vec3 col = vec3(0.0);
-      for (int i = 0; i < 9; i++) {
-        float fi = float(i);
-        // one full turn of the ring per loop
-        float a = TAU * (fi / 9.0 + phase);
-        vec2 radial = vec2(cos(a), sin(a));
-        vec2 tangent = vec2(-radial.y, radial.x);
-        vec2 q = p - radial * 0.3;
-        // coins tip as they come round, so they read as discs seen at an angle
-        float tip = 0.45 + 0.55 * abs(cos(a + TAU * phase));
-        vec2 local = vec2(dot(q, tangent) / tip, dot(q, radial));
-        float d = length(local) - 0.13;
-        vec3 tint = 0.72 + 0.25 * cos(TAU * (vec3(0.0, 0.33, 0.67) + fi / 9.0));
-        float shade = 0.7 + 0.35 * smoothstep(0.13, 0.0, length(local + vec2(0.03, -0.04)));
-        // the embossed bag on each face
-        float emboss = smoothstep(0.006, 0.0, abs(sdRoundBox(local, vec2(0.045, 0.055), 0.01)));
-        col = mix(col, tint * (shade - emboss * 0.15), fill(d));
-      }
-      return col;
+      float r = length(p);
+      float angle = fract(atan(p.y, p.x) / TAU + 0.5);
+      float count = 9.0;
+      float turn = fract(angle - phase / count);
+      float slot = floor(turn * count);
+      float f = fract(turn * count);
+      float present = smoothstep(0.02, 0.1, abs(angle - 0.5));
+      float ring = smoothstep(0.12, 0.135, r) * smoothstep(0.34, 0.325, r);
+      float edges = smoothstep(0.0, 0.07, f) * smoothstep(1.0, 0.93, f);
+      vec3 tint = 0.72 + 0.26 * cos(TAU * (vec3(0.0, 0.33, 0.67) + angle + 0.15));
+      tint = mix(vec3(1.0), tint, 0.75);
+      tint *= 0.9 + 0.2 * (r - 0.12) / 0.22;
+      float shade = 0.78 + 0.25 * (1.0 - abs(f - 0.5) * 2.0) + (r - 0.23) * 0.8;
+      // an embossed mark on every face
+      float mark = smoothstep(0.012, 0.004, abs(length(vec2((f - 0.5) * 0.14, r - 0.23)) - 0.035));
+      return tint * shade * (1.0 - 0.2 * mark) * ring * edges * present;
     }
   `,
 
+  // a phone screen with a photo card sliding up through it
   phone: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec3 col = vec3(0.0);
+      // a dim panel standing off to the side
+      col += vec3(0.1) * step(0.78, uv.x);
       vec2 phoneCentre = vec2(-0.1 + 0.05 * sin(TAU * phase), 0.05);
       float phone = sdRoundBox(p - phoneCentre, vec2(0.22, 0.46), 0.06);
       float onScreen = fill(phone);
       col = mix(col, mix(vec3(0.93, 0.95, 1.0), vec3(0.75, 0.84, 1.0), uv.y), onScreen);
-      // a photo card slides up through the screen and out of it
       vec2 cardCentre = phoneCentre + vec2(0.02, (fract(phase) - 0.5) * 1.4);
       float card = fill(sdRoundBox(p - cardCentre, vec2(0.16, 0.14), 0.01)) * onScreen;
       vec3 photo = mix(vec3(0.12, 0.2, 0.55), vec3(0.95, 0.5, 0.15),
@@ -271,74 +275,141 @@ const BODIES: Record<PainterId, string> = {
     }
   `,
 
+  // a glass pavilion under a flat roof, warm goods behind the glass, a
+  // white bench out front, a tree to one side, peach evening sky
   storefront: `
     vec3 paint(vec2 uv, float phase, float aspect) {
-      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec2 loop = loopVec(phase);
-      p.x += 0.06 * loop.y;
-      vec3 col = mix(vec3(0.9, 0.74, 0.6), vec3(0.62, 0.6, 0.64), smoothstep(-0.1, 0.5, p.y));
-      float ground = smoothstep(0.01, -0.01, p.y + 0.22 + p.x * 0.12);
-      col = mix(col, vec3(0.3, 0.28, 0.33), ground);
+      vec2 q = uv + vec2(0.015 * loop.x, 0.008 * loop.y);
+      vec3 col = mix(vec3(0.98, 0.88, 0.8), vec3(0.88, 0.84, 0.9), smoothstep(0.5, 1.0, q.y));
+      // lavender paving
+      col = mix(col, mix(vec3(0.46, 0.43, 0.52), vec3(0.62, 0.58, 0.66), q.y / 0.32), step(q.y, 0.32));
 
-      float glass = fill(sdRoundBox(p - vec2(0.05, -0.02), vec2(0.62, 0.2), 0.01));
-      vec3 inside = mix(vec3(0.95, 0.55, 0.3), vec3(0.6, 0.78, 0.7), fbm3(vec3(p * 4.0 + loop * 0.3, 1.0)));
-      inside = mix(inside, vec3(1.0, 0.6, 0.72),
-        smoothstep(0.55, 0.75, fbm3(vec3(p * 6.0 + 3.0 + loop * 0.2, 2.0))) * 0.6);
-      float mullion = smoothstep(0.06, 0.0, abs(fract((p.x + 0.57) * 5.0) - 0.5));
-      inside = mix(inside, vec3(0.85, 0.8, 0.72), mullion * 0.7);
-      col = mix(col, inside, glass);
+      float glass = step(0.06, q.x) * step(q.x, 0.86) * step(0.32, q.y) * step(q.y, 0.72);
+      vec3 goods = mix(vec3(0.96, 0.8, 0.66), vec3(0.62, 0.78, 0.72), smoothstep(0.45, 0.7, fbm3(vec3(q * 7.0, 1.0))));
+      goods = mix(goods, vec3(0.98, 0.7, 0.76), smoothstep(0.64, 0.8, fbm3(vec3(q * 9.0 + 3.0, 2.0))) * 0.6);
+      // a big orange drape across the middle
+      float drape = smoothstep(0.05, 0.0, abs(q.y - 0.56 - 0.05 * sin(q.x * 14.0)) - 0.03);
+      goods = mix(goods, vec3(1.0, 0.52, 0.26), drape * step(0.25, q.x) * step(q.x, 0.62));
+      goods *= 0.8 + 0.25 * smoothstep(0.32, 0.72, q.y);
+      float mullion = smoothstep(0.46, 0.49, abs(fract((q.x - 0.06) / 0.16) - 0.5));
+      goods = mix(goods, vec3(0.35, 0.33, 0.3), mullion);
+      col = mix(col, goods, glass);
 
-      col = mix(col, vec3(0.62, 0.66, 0.62), fill(sdRoundBox(p - vec2(0.03, 0.22), vec2(0.7, 0.03), 0.005)));
-      float canopy = length((p - vec2(-0.55, 0.3)) * vec2(1.0, 1.3)) - 0.2 + 0.08 * fbm3(vec3(p * 9.0, 4.0));
-      col = mix(col, vec3(0.3, 0.42, 0.3), smoothstep(0.01, -0.01, canopy) * 0.9);
+      // roof slab: a cream fascia over a teal-grey underside
+      float roof = step(0.03, q.x) * step(q.x, 0.9);
+      col = mix(col, vec3(0.42, 0.5, 0.48), roof * step(0.72, q.y) * step(q.y, 0.76));
+      col = mix(col, vec3(0.96, 0.9, 0.78), roof * step(0.76, q.y) * step(q.y, 0.8));
+
+      // the bench
+      float bench = step(0.52, q.x) * step(q.x, 0.78) * step(0.1, q.y) * step(q.y, 0.24);
+      float slats = step(0.5, fract(q.y * 40.0));
+      col = mix(col, vec3(0.95, 0.93, 0.88) * (0.85 + 0.15 * slats), bench);
+
+      // the tree
+      float canopy = length((q - vec2(0.93, 0.78)) * vec2(1.0, 1.2)) - 0.14 + 0.05 * fbm3(vec3(q * 12.0, 3.0));
+      col = mix(col, vec3(0.3, 0.42, 0.28), smoothstep(0.01, -0.01, canopy));
+      col = mix(col, vec3(0.3, 0.24, 0.2), step(abs(q.x - 0.92), 0.01) * step(0.3, q.y) * step(q.y, 0.7));
+      // pink flowers along the left
+      col = mix(col, vec3(0.95, 0.6, 0.72), smoothstep(0.62, 0.72, fbm3(vec3(q * 18.0, 5.0))) * step(q.x, 0.12) * step(0.25, q.y) * step(q.y, 0.45));
       return col;
     }
   `,
 
+  // rainbow light pouring out of a white-hot centre in every direction
+  rays: `
+    vec3 paint(vec2 uv, float phase, float aspect) {
+      vec2 loop = loopVec(phase);
+      vec2 p = (uv - vec2(0.55, 0.5)) * vec2(aspect, 1.0);
+      float r = length(p);
+      float a = atan(p.y, p.x);
+      float swirl = a + r * (0.8 + 0.4 * loop.x);
+      vec3 col = vec3(0.0);
+      for (int c = 0; c < 3; c++) {
+        float spread = (float(c) - 1.0) * (0.05 + 0.12 * r);
+        float angle = swirl + spread;
+        vec3 q = vec3(cos(angle) * 5.0, sin(angle) * 5.0, r * 1.6) + vec3(loop * 0.5, 0.0);
+        col[c] = pow(noise3(q) * 0.7 + noise3(q * 2.1) * 0.3, 4.0);
+      }
+      col = mix(vec3(dot(col, vec3(0.3333))), col, 0.55);
+      col *= exp(-r * 1.4) * 3.2;
+      col += vec3(1.0, 0.98, 0.95) * (exp(-r * r * 60.0) * 0.9 + exp(-r * 6.0) * 0.18);
+      return clamp(col, 0.0, 1.0);
+    }
+  `,
+
+  // Marketing's collage: product and lifestyle photos and UI cards laid out
+  // on black, coming and going
   collage: `
-    vec3 paint(vec2 uv, float phase, float aspect) {
-      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-      vec3 col = vec3(0.0);
-      for (int i = 0; i < 10; i++) {
-        float fi = float(i);
-        // whole-number speeds keep the loop seamless
-        float speed = hash1(fi * 1.3) < 0.5 ? 1.0 : 2.0;
-        float x = (fract(hash1(fi * 2.9) + phase * speed) - 0.5) * (aspect + 0.6);
-        float y = (hash1(fi * 4.7) - 0.5) * 0.9;
-        vec2 size = vec2(0.05 + 0.09 * hash1(fi * 6.1), 0.04 + 0.08 * hash1(fi * 8.3));
-        vec2 q = p - vec2(x, y);
-        float inside = fill(sdRoundBox(q, size, 0.01));
-        vec3 base = 0.38 + 0.32 * cos(TAU * (vec3(0.0, 0.25, 0.55) + hash1(fi * 11.0)));
-        vec3 photo = base * (0.35 + 0.6 * fbm3(vec3(q * 14.0, fi)));
-        photo = mix(photo, vec3(0.95), smoothstep(0.7, 0.9, fbm3(vec3(q * 30.0, fi + 5.0))) * 0.5);
-        col = mix(col, clamp(photo, 0.0, 1.0), inside);
+    vec3 photoTile(vec2 q, float kind, float seed) {
+      if (kind < 1.0) {
+        // hanging shopping bags: tall stripes of colour with white tags
+        float stripe = floor((q.x + 1.0) * 5.0);
+        vec3 bag = 0.5 + 0.45 * cos(TAU * (vec3(0.0, 0.3, 0.6) + hash1(stripe + seed) * 0.8));
+        bag = mix(bag, vec3(0.95), step(0.7, hash1(stripe * 3.1 + seed)) * step(q.y, 0.2));
+        return bag * (0.75 + 0.25 * q.y);
       }
-      // specks of interface text
-      col += vec3(0.85) * step(0.986, hash2(floor(uv * vec2(aspect, 1.0) * 90.0) + floor(phase * 4.0)));
-      return col;
+      if (kind < 2.0) {
+        // a figure against a blue sky
+        vec3 sky = mix(vec3(0.35, 0.6, 0.9), vec3(0.7, 0.85, 1.0), q.y * 0.5 + 0.5);
+        float body = smoothstep(0.05, 0.0, length((q - vec2(0.0, -0.1)) * vec2(2.2, 0.8)) - 0.45);
+        vec3 look = mix(vec3(0.95, 0.5, 0.2), vec3(0.45, 0.2, 0.3), step(0.1, q.y));
+        return mix(sky, look, body);
+      }
+      if (kind < 3.0) {
+        // an evening meadow
+        vec3 sky = mix(vec3(0.98, 0.55, 0.35), vec3(0.95, 0.75, 0.6), q.y);
+        vec3 field = mix(vec3(0.15, 0.2, 0.1), vec3(0.35, 0.4, 0.2), fbm3(vec3(q * 6.0, seed)));
+        return mix(field, sky, step(-0.1 + 0.08 * sin(q.x * 3.0), q.y));
+      }
+      if (kind < 4.0) {
+        // a phone screen with a photo on it
+        vec3 screen = vec3(0.9, 0.92, 0.98);
+        float pic = step(abs(q.x), 0.7) * step(abs(q.y - 0.15), 0.4);
+        vec3 picCol = mix(vec3(0.95, 0.55, 0.3), vec3(0.85, 0.3, 0.4), q.y * 0.5 + 0.5);
+        screen = mix(screen, picCol, pic);
+        return mix(screen, vec3(0.6), step(0.5, fract(q.x * 8.0)) * step(abs(q.y + 0.7), 0.05));
+      }
+      // a sheet of white product cards
+      vec2 grid = fract((q + 1.0) * vec2(4.0, 1.5));
+      vec2 id = floor((q + 1.0) * vec2(4.0, 1.5));
+      vec3 cardCol = vec3(0.95);
+      float item = smoothstep(0.25, 0.2, length(grid - 0.5));
+      vec3 itemCol = 0.4 + 0.4 * cos(TAU * (vec3(0.0, 0.33, 0.67) + hash2(id + seed)));
+      cardCol = mix(cardCol, itemCol, item);
+      return cardCol * step(0.08, grid.x) * step(0.08, grid.y);
     }
-  `,
 
-  tiles: `
     vec3 paint(vec2 uv, float phase, float aspect) {
-      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec3 col = vec3(0.0);
-      for (int i = 0; i < 8; i++) {
+      for (int i = 0; i < 7; i++) {
         float fi = float(i);
-        vec2 centre = vec2((hash1(fi * 3.1) - 0.5) * aspect * 0.85, (hash1(fi * 7.3) - 0.5) * 0.8);
-        // each tile grows in, holds and shrinks away once per loop
-        float life = 0.5 - 0.5 * cos(TAU * (phase + hash1(fi * 1.9)));
-        vec2 size = vec2(0.1 + 0.08 * hash1(fi * 5.7), 0.08 + 0.06 * hash1(fi * 9.1)) * (0.4 + 0.8 * life);
-        vec2 q = p - centre;
-        float inside = fill(sdRoundBox(q, size, 0.008));
-        vec2 local = q / size;
-        // light studio or sky backdrop, a coloured subject, a ground band
-        vec3 backdrop = mix(vec3(0.95, 0.94, 0.92), vec3(0.62, 0.78, 0.92), step(0.5, hash1(fi * 2.2)));
-        vec3 subject = 0.45 + 0.4 * cos(TAU * (vec3(0.0, 0.3, 0.6) + hash1(fi * 11.0)));
-        vec3 photo = mix(backdrop, subject, smoothstep(0.45, 0.35, length(local * vec2(1.4, 0.8))));
-        photo = mix(photo, vec3(0.35, 0.5, 0.3), (1.0 - smoothstep(-0.7, -0.55, local.y)) * step(0.5, hash1(fi * 4.4)));
-        col = mix(col, photo, inside);
+        vec2 centre = fi < 0.5 ? vec2(0.75, 0.87)
+          : fi < 1.5 ? vec2(0.42, 0.7)
+          : fi < 2.5 ? vec2(0.74, 0.47)
+          : fi < 3.5 ? vec2(0.56, 0.47)
+          : fi < 4.5 ? vec2(0.52, 0.15)
+          : fi < 5.5 ? vec2(0.3, 0.22)
+          : vec2(0.62, 0.55);
+        vec2 halfSize = fi < 0.5 ? vec2(0.17, 0.09)
+          : fi < 1.5 ? vec2(0.12, 0.1)
+          : fi < 2.5 ? vec2(0.14, 0.11)
+          : fi < 3.5 ? vec2(0.09, 0.14)
+          : fi < 4.5 ? vec2(0.22, 0.08)
+          : fi < 5.5 ? vec2(0.1, 0.1)
+          : vec2(0.17, 0.035);
+        float kind = fi < 0.5 ? 0.0 : fi < 1.5 ? 1.0 : fi < 2.5 ? 2.0 : fi < 3.5 ? 3.0 : fi < 4.5 ? 4.0 : fi < 5.5 ? 1.0 : 3.0;
+        float t = fract(phase + hash1(fi * 5.3));
+        float shown = smoothstep(0.05, 0.15, t) * smoothstep(0.85, 0.72, t);
+        vec2 q = (uv - centre) / halfSize;
+        float inside = step(abs(q.x), 1.0) * step(abs(q.y), 1.0);
+        vec3 tile = fi > 5.5 ? vec3(0.92, 0.9, 0.94) : photoTile(q, kind, fi);
+        col = mix(col, tile, inside * shown);
       }
+      // stat labels scattered between the tiles
+      vec2 label = floor(uv * vec2(24.0, 60.0));
+      float text = step(0.965, hash2(label)) * step(0.3, fract(uv.x * 24.0 * 3.0));
+      col += vec3(0.85) * text * (1.0 - step(0.01, dot(col, vec3(1.0))));
       return col;
     }
   `,
@@ -367,105 +438,195 @@ const BODIES: Record<PainterId, string> = {
     }
   `,
 
+  // the Shop swirl: lavender bands winding into a white hook round a dark eye
   swirl: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       float r = length(p);
       float a = atan(p.y, p.x);
-      // two arms winding in, turning once per loop
-      float arms = fract(a / TAU * 2.0 + log(r + 0.02) * 1.6 - phase);
-      float band = smoothstep(0.0, 0.08, arms) * smoothstep(0.55, 0.35, arms);
-      float rings = 0.5 + 0.5 * sin(r * 70.0 - TAU * phase * 3.0);
-      vec3 col = mix(vec3(0.04, 0.03, 0.1), mix(vec3(0.22, 0.18, 0.55), vec3(0.62, 0.58, 0.95), rings), band);
-      col *= smoothstep(1.2, 0.2, r);
-      // the bright hook in the middle
-      float gap = smoothstep(0.3, 0.45, fract(a / TAU - phase + 1.0));
-      col = mix(col, vec3(0.95, 0.94, 1.0), fill(abs(r - 0.1) - 0.035) * gap);
-      col += step(0.994, hash2(floor(uv * vec2(aspect, 1.0) * 160.0))) * 0.5;
+      // one tightly wound arm, close to concentric rings, rocking a little
+      float s = r * 6.0 + a / TAU - 0.15 * sin(TAU * phase);
+      float band = smoothstep(-0.25, 0.45, cos(TAU * s));
+      float groove = smoothstep(0.05, 0.0, abs(fract(s) - 0.5) - 0.44);
+      vec3 col = mix(vec3(0.13, 0.11, 0.32), vec3(0.88, 0.86, 1.0), band);
+      col *= 0.9 + 0.12 * cos(a - 0.8);
+      col = mix(col, vec3(0.14, 0.12, 0.26), groove * 0.6);
+      float gap = smoothstep(0.0, 0.08, fract(a / TAU - 0.06 * sin(TAU * phase) + 0.3));
+      col += vec3(0.9, 0.88, 1.0) * exp(-max(r - 0.11, 0.0) * 16.0) * 0.3;
+      // the white hook, then a lavender iris round a dark pupil
+      col = mix(col, vec3(1.0), fill(abs(r - 0.09) - 0.03) * gap);
+      col = mix(col, mix(vec3(0.42, 0.38, 0.72), vec3(0.2, 0.17, 0.42), smoothstep(0.06, 0.03, r)), fill(r - 0.06));
+      col = mix(col, vec3(0.06, 0.05, 0.14), fill(r - 0.028));
       return col;
     }
   `,
 
+  // Payments: teal cards seen at an angle, stacking up one on another, with
+  // letters floating round them
   cards: `
+    vec4 card(vec2 p, vec2 centre, float top) {
+      mat2 toCard = mat2(0.8, 0.34, -0.39, 0.22);
+      // inverse of the card's axes on screen
+      float det = toCard[0][0] * toCard[1][1] - toCard[1][0] * toCard[0][1];
+      mat2 inv = mat2(toCard[1][1], -toCard[0][1], -toCard[1][0], toCard[0][0]) / det;
+      vec2 q = inv * (p - centre);
+      float d = sdRoundBox(q, vec2(0.5, 0.32), 0.05);
+      vec2 qs = inv * (p - centre + vec2(0.0, 0.018));
+      float side = fill(sdRoundBox(qs, vec2(0.5, 0.32), 0.05));
+      vec3 face = top > 0.5
+        ? mix(vec3(0.04, 0.36, 0.4), vec3(0.12, 0.58, 0.58), q.x + 0.5)
+        : mix(vec3(0.12, 0.16, 0.18), vec3(0.22, 0.28, 0.3), q.x + 0.5);
+      face += vec3(0.35, 0.7, 0.7) * exp(-abs(d) * 160.0) * 0.8;
+      face = mix(face, vec3(0.85, 0.7, 0.35), top * fill(sdRoundBox(q - vec2(-0.3, 0.06), vec2(0.07, 0.05), 0.01)));
+      float digits = step(0.5, fract(q.x * 16.0)) * step(abs(q.y + 0.1), 0.025) * step(abs(q.x + 0.05), 0.3);
+      face = mix(face, vec3(0.9), top * digits * 0.8);
+      float body = fill(d);
+      return vec4(mix(vec3(0.05, 0.18, 0.2), face, body), max(body, side));
+    }
+
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec3 col = vec3(0.0);
-      mat2 tilt = mat2(0.99, 0.12, -0.12, 0.99);
-      for (int i = 0; i < 6; i++) {
+      float stack = 1.0 - abs(fract(phase) * 2.0 - 1.0);
+      for (int i = 0; i < 3; i++) {
         float fi = float(i);
-        float t = fract(hash1(fi * 3.7) + phase);
-        vec2 c = vec2(mix(-1.6, 1.6, t) * aspect * 0.5, (hash1(fi * 5.3) - 0.5) * 0.8 + mix(-0.15, 0.15, t));
-        vec2 q = tilt * (p - c);
-        q.y /= 0.5;
-        float card = fill(sdRoundBox(q, vec2(0.3, 0.19), 0.03));
-        vec3 face = mix(vec3(0.02, 0.28, 0.32), vec3(0.08, 0.5, 0.52), 0.5 + 0.5 * q.x / 0.3);
-        face = mix(face, vec3(0.85, 0.7, 0.35), fill(sdRoundBox(q - vec2(-0.18, 0.02), vec2(0.04, 0.03), 0.006)));
-        float digits = step(0.5, fract(q.x * 22.0)) * smoothstep(0.012, 0.0, abs(q.y + 0.06)) * step(abs(q.x + 0.02), 0.22);
-        face = mix(face, vec3(0.9), digits * 0.8);
-        col = mix(col, face, card);
+        float shown = smoothstep(fi * 0.4, fi * 0.4 + 0.1, stack + 0.05);
+        vec4 c = card(p, vec2(0.0, -0.1 + fi * 0.08), fi > 1.5 || stack < (fi + 1.0) * 0.4 ? 1.0 : 0.0);
+        col = mix(col, c.rgb, c.a * shown);
       }
+      // letters drifting up around the stack
+      vec2 cell = floor(p * vec2(14.0, 10.0));
+      vec2 inCell = fract(p * vec2(14.0, 10.0));
+      float blink = step(0.4, fract(hash2(cell + 3.0) + phase * 2.0));
+      float letter = step(0.93, hash2(cell)) * blink * step(abs(inCell.x - 0.5), 0.12) * step(abs(inCell.y - 0.5), 0.2);
+      col += vec3(0.85) * letter * step(0.35, abs(p.x) + abs(p.y) * 0.5);
       return col;
     }
   `,
 
+  // an iridescent ring seen edge-on, light streaming out of it sideways
   vortex: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec2 loop = loopVec(phase);
-      vec2 d = (p - vec2(0.05 * loop.y, -0.02)) * vec2(1.0, 1.8);
+      vec2 d = mat2(0.97, 0.24, -0.24, 0.97) * (p - vec2(0.08 + 0.04 * loop.y, -0.02));
+      d.y *= 2.4;
       float r = length(d);
       float a = atan(d.y, d.x);
-      float rays = pow(noise3(vec3(cos(a) * 40.0 + loop.x * 2.0, sin(a) * 40.0 + loop.y * 2.0, r * 2.0)), 2.5) * 1.4
-        + pow(noise3(vec3(cos(a) * 110.0 + loop.x * 3.0, sin(a) * 110.0 + loop.y * 3.0, r * 5.0)), 6.0);
-      float fall = exp(-r * 2.2) * smoothstep(0.02, 0.1, r);
-      vec3 col = vec3(0.75, 0.82, 0.9) * rays * fall * 1.6;
-      float ring = exp(-pow((r - 0.14) * 22.0, 2.0));
-      col += (0.5 + 0.5 * cos(TAU * (vec3(0.0, 0.33, 0.67) + r * 4.0) + a)) * ring * 0.9;
-      col *= 0.2 + 0.8 * smoothstep(-0.45, 0.1, -p.y);
-      return col;
+      float rays = pow(noise3(vec3(cos(a) * 12.0 + loop.x, sin(a) * 12.0 + loop.y, r * 1.5)), 3.0);
+      vec3 col = vec3(0.8, 0.84, 0.92) * rays * exp(-r * 2.0) * smoothstep(0.04, 0.14, r) * 1.2;
+      float ring = exp(-pow((r - 0.16) * 16.0, 2.0));
+      col += (0.55 + 0.45 * cos(TAU * (vec3(0.0, 0.33, 0.67) + a / TAU * 2.0 + r * 3.0))) * ring;
+      col *= smoothstep(0.02, 0.1, r);
+      // a white haze pouring off to the left
+      col += vec3(0.9, 0.92, 0.97) * exp(-length((p - vec2(-0.12, 0.04)) * vec2(0.8, 2.0)) * 3.2) * 0.9;
+      return clamp(col, 0.0, 1.0);
     }
   `,
 
+  // a stepped pyramid of glowing blocks on a glossy floor scattered with
+  // small lit cubes
   bars: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec2 loop = loopVec(phase);
       vec3 col = vec3(0.01);
-      float x = p.x + 0.08 * loop.y;
-      // a stepped pyramid of blocks: each row up is a block narrower
-      float rowHeight = 0.09;
-      float row = floor((p.y + 0.42) / rowHeight);
-      float halfWidth = 0.62 - row * 0.075;
-      vec2 cell = vec2(fract((x + 2.0) / 0.12), fract((p.y + 0.42) / rowHeight));
-      float gaps = smoothstep(0.0, 0.08, cell.x) * smoothstep(1.0, 0.92, cell.x)
-        * smoothstep(0.0, 0.1, cell.y) * smoothstep(1.0, 0.9, cell.y);
+      float x = p.x + 0.06 * loop.y;
+      float floorY = -0.18;
+      float rowHeight = 0.07;
+      float y = p.y - floorY;
+      float row = floor(y / rowHeight);
+      float halfWidth = 0.52 - row * 0.065;
+      vec2 cell = vec2(fract((x + 2.0) / 0.1), fract(y / rowHeight));
+      float gaps = smoothstep(0.0, 0.08, cell.x) * smoothstep(1.0, 0.92, cell.x) * smoothstep(0.0, 0.1, cell.y) * smoothstep(1.0, 0.9, cell.y);
       float body = step(0.0, row) * step(row, 7.0) * smoothstep(0.02, -0.02, abs(x) - halfWidth);
-      float streak = 0.85 + 0.15 * noise3(vec3(p.x * 1.5 + loop.x * 0.8, p.y * 50.0, loop.y * 0.8));
-      float shade = 0.8 + 0.2 * hash2(vec2(floor((x + 2.0) / 0.12), row));
-      // the top rows catch more light
-      float lift = 0.85 + 0.25 * clamp(row / 7.0, 0.0, 1.0);
-      col = mix(col, vec3(1.0, 0.98, 0.86) * streak * shade * lift, body * (0.45 + 0.55 * gaps));
-      col += vec3(0.85, 0.65, 0.25) * exp(-pow((p.y + 0.46) * 35.0, 2.0)) * 0.4
-        * smoothstep(0.3, 0.8, noise3(vec3(p.x * 3.0 + loop.x, 7.0 + loop.y, 0.0)));
+      float shade = 0.8 + 0.2 * hash2(vec2(floor((x + 2.0) / 0.1), row));
+      col = mix(col, vec3(1.0, 0.98, 0.86) * shade, body * (0.5 + 0.5 * gaps));
+      // the glossy floor mirrors the lowest rows
+      float mirrorY = floorY - p.y;
+      float mirrorRow = floor(mirrorY / rowHeight);
+      float mirror = step(0.0, mirrorY) * step(mirrorRow, 2.0) * smoothstep(0.02, -0.02, abs(x) - (0.52 - mirrorRow * 0.065));
+      col += vec3(0.8, 0.8, 0.7) * mirror * 0.25 * exp(-mirrorY * 8.0);
+      // small cubes lit blue or amber, scattered across the floor
+      for (int i = 0; i < 14; i++) {
+        float fi = float(i);
+        vec2 at = vec2((hash1(fi * 2.7) - 0.5) * 1.6 + 0.03 * loop.x, floorY - 0.04 - hash1(fi * 5.1) * 0.28);
+        float size = 0.018 + 0.02 * hash1(fi * 7.3);
+        float cube = fill(sdRoundBox(p - at, vec2(size), 0.003));
+        vec3 tint = hash1(fi * 9.9) < 0.5 ? vec3(0.55, 0.7, 1.0) : vec3(1.0, 0.75, 0.4);
+        col = mix(col, mix(vec3(0.95), tint, 0.5), cube);
+        col += tint * exp(-length(p - at) * 30.0) * 0.25;
+      }
       return clamp(col, 0.0, 1.0);
     }
   `,
 
+  // Developer: a two-by-two grid of dark site screenshots, one swapped for a
+  // page of code as it plays
   screens: `
     vec3 paint(vec2 uv, float phase, float aspect) {
-      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-      vec2 cellSize = vec2(0.6, 0.5);
-      // a wall of panels drifting one panel per loop
-      vec2 q = vec2(p.x, p.y * 1.4) + phase * cellSize;
-      vec2 id = floor(q / cellSize);
-      vec2 f = fract(q / cellSize) - 0.5;
-      float panel = smoothstep(0.02, -0.02, sdRoundBox(f, vec2(0.44, 0.4), 0.02));
-      vec3 screen = mix(vec3(0.05, 0.08, 0.07), vec3(0.18, 0.28, 0.25), f.y + 0.5);
-      screen *= 0.7 + 0.5 * fbm3(vec3(f * 4.0 + id * 3.1, 1.0));
-      screen += step(0.97, hash2(floor((f + id) * 60.0))) * 0.5;
-      float text = step(0.45, fract(f.x * 18.0)) * smoothstep(0.03, 0.0, abs(f.y)) * step(abs(f.x), 0.3);
-      screen += vec3(0.85) * text * step(0.4, hash2(id));
-      return screen * panel * step(0.25, hash2(id + 7.0));
+      vec3 col = vec3(0.0);
+      float swap = floor(fract(phase) * 4.0);
+      for (int i = 0; i < 4; i++) {
+        float fi = float(i);
+        vec2 centre = vec2(mod(fi, 2.0) < 0.5 ? 0.29 : 0.71, fi < 1.5 ? 0.71 : 0.3);
+        vec2 local = (uv - centre) / vec2(0.2, 0.17);
+        float inside = step(abs(local.x), 1.0) * step(abs(local.y), 1.0);
+        vec3 screen = mix(vec3(0.04, 0.07, 0.07), vec3(0.12, 0.2, 0.19), local.y * 0.5 + 0.5);
+        screen *= 0.7 + 0.5 * fbm3(vec3(local * 2.0 + fi, 1.0));
+        screen += vec3(0.8) * step(0.985, hash2(floor(local * 60.0) + fi));
+        float line1 = step(abs(local.y + 0.02), 0.08) * step(-0.8, local.x) * step(local.x, 0.35);
+        float line2 = step(abs(local.y + 0.24), 0.08) * step(-0.8, local.x) * step(local.x, 0.05);
+        float glyphs = step(0.3, fract(local.x * 8.0 + fi * 0.3));
+        screen = mix(screen, vec3(0.92), (line1 + line2) * glyphs);
+        screen += vec3(0.5) * step(0.86, local.y) * step(0.6, hash2(floor(local * vec2(30.0, 3.0))));
+        // one panel at a time turns into a page of code
+        float code = step(abs(fi - swap), 0.5);
+        vec2 textCell = floor((local + 1.0) * vec2(22.0, 12.0));
+        float glyph = step(0.45, hash2(textCell)) * step(hash1(textCell.y * 3.1) * 22.0, 22.0 - textCell.x);
+        vec3 page = vec3(0.9) * glyph * step(0.3, fract((local.x + 1.0) * 22.0));
+        col = mix(col, mix(screen, page, code), inside);
+      }
+      return col;
+    }
+  `,
+
+  // a grid of photos, cells switching between shots as it plays
+  tiles: `
+    vec3 shot(vec2 q, float kind) {
+      if (kind < 0.2) {
+        vec3 sky = mix(vec3(0.62, 0.76, 0.92), vec3(0.88, 0.92, 0.96), q.y);
+        return mix(mix(vec3(0.3, 0.5, 0.22), vec3(0.45, 0.6, 0.3), q.x), sky, step(0.45 + 0.06 * sin(q.x * 7.0), q.y));
+      }
+      if (kind < 0.4) {
+        vec3 bg = vec3(0.86, 0.78, 0.92);
+        return mix(bg, vec3(0.92, 0.5, 0.62), smoothstep(0.26, 0.2, length((q - 0.5) * vec2(1.0, 1.8))));
+      }
+      if (kind < 0.6) {
+        vec3 bg = vec3(0.94, 0.93, 0.91);
+        return mix(bg, vec3(0.82, 0.32, 0.52), smoothstep(0.03, 0.0, length((q - vec2(0.5, 0.45)) * vec2(3.0, 1.0)) - 0.35));
+      }
+      if (kind < 0.8) {
+        return mix(vec3(0.5, 0.38, 0.3), vec3(0.85, 0.72, 0.55), fbm3(vec3(q * 5.0, 2.0)));
+      }
+      vec3 bg = vec3(0.3, 0.5, 0.82);
+      return mix(bg, vec3(0.5, 0.68, 0.98), smoothstep(0.3, 0.24, length(q - 0.5)));
+    }
+
+    vec3 paint(vec2 uv, float phase, float aspect) {
+      vec2 grid = uv * vec2(3.0, 3.0);
+      vec2 id = floor(grid);
+      vec2 q = fract(grid);
+      float gutter = step(0.05, q.x) * step(q.x, 0.95) * step(0.06, q.y) * step(q.y, 0.94);
+      float segment = floor(fract(phase) * 5.0);
+      float within = fract(fract(phase) * 5.0);
+      float kind = hash2(id + segment * 7.1);
+      float next = hash2(id + mod(segment + 1.0, 5.0) * 7.1);
+      float empty = step(hash2(id * 3.3 + segment), 0.25);
+      vec3 a = shot((q - 0.05) / 0.9, kind);
+      vec3 b = shot((q - 0.05) / 0.9, next);
+      vec3 photo = mix(a, b, smoothstep(0.85, 1.0, within));
+      return photo * gutter * (1.0 - empty);
     }
   `,
 };
