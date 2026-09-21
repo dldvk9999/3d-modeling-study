@@ -42,6 +42,9 @@ const VERT = `
   uniform vec3 uConveyorAxis;
   uniform sampler2D uFluid;
   uniform float uFluidInfluence;
+  // the chapter's selective colour grade: nine ranges of (hue turn, saturation, lightness)
+  uniform float uSelectiveAmount;
+  uniform vec3 uSelectiveAdj[9];
 
   attribute vec3 color;
   attribute vec4 aRandom;
@@ -55,6 +58,96 @@ const VERT = `
 
   float hash(vec3 p) {
     return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
+  }
+
+  // a hue sector's pull, falling to nothing a sixth of a turn away
+  float hueSectorWeight(float hue, float centre) {
+    float d = abs(hue - centre);
+    d = min(d, 1.0 - d);
+    return clamp(1.0 - d * 6.0, 0.0, 1.0);
+  }
+
+  float hueToRgbChannel(float p, float q, float t) {
+    t = fract(t);
+    if (t < 1.0 / 6.0) return p + (q - p) * 6.0 * t;
+    if (t < 0.5) return q;
+    if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+    return p;
+  }
+
+  vec3 hslToRgb(vec3 hsl) {
+    float h = hsl.x;
+    float sat = clamp(hsl.y, 0.0, 1.0);
+    float l = clamp(hsl.z, 0.0, 1.0);
+    if (sat < 0.0001) return vec3(l);
+    float q = l < 0.5 ? l * (1.0 + sat) : l + sat - l * sat;
+    float p = 2.0 * l - q;
+    return vec3(
+      hueToRgbChannel(p, q, h + 1.0 / 3.0),
+      hueToRgbChannel(p, q, h),
+      hueToRgbChannel(p, q, h - 1.0 / 3.0)
+    );
+  }
+
+  // the original's selective colour: per hue sector and per lightness band,
+  // shift hue, saturation and lightness
+  vec3 applySelectiveColor(vec3 rgb) {
+    float amount = clamp(uSelectiveAmount, 0.0, 1.0);
+    if (amount < 0.0001) return rgb;
+
+    float maxC = max(rgb.r, max(rgb.g, rgb.b));
+    float minC = min(rgb.r, min(rgb.g, rgb.b));
+    float chroma = maxC - minC;
+
+    float hue = 0.0;
+    vec4 wRYGC = vec4(0.0);
+    vec2 wBM = vec2(0.0);
+    if (chroma > 0.0001) {
+      if (rgb.r >= rgb.g && rgb.r >= rgb.b) {
+        hue = (rgb.g - rgb.b) / chroma;
+        if (hue < 0.0) hue += 6.0;
+      } else if (rgb.g >= rgb.b) {
+        hue = (rgb.b - rgb.r) / chroma + 2.0;
+      } else {
+        hue = (rgb.r - rgb.g) / chroma + 4.0;
+      }
+      hue *= 1.0 / 6.0;
+      wRYGC = vec4(
+        hueSectorWeight(hue, 0.0 / 6.0),
+        hueSectorWeight(hue, 1.0 / 6.0),
+        hueSectorWeight(hue, 2.0 / 6.0),
+        hueSectorWeight(hue, 3.0 / 6.0)
+      );
+      wBM = vec2(hueSectorWeight(hue, 4.0 / 6.0), hueSectorWeight(hue, 5.0 / 6.0));
+    }
+
+    float L = (maxC + minC) * 0.5;
+    float wW = smoothstep(0.5, 1.0, L);
+    float wK = 1.0 - smoothstep(0.0, 0.5, L);
+    float wN = clamp(1.0 - abs(L * 2.0 - 1.0), 0.0, 1.0);
+
+    vec3 totalAdj =
+      wRYGC.x * uSelectiveAdj[0] +
+      wRYGC.y * uSelectiveAdj[1] +
+      wRYGC.z * uSelectiveAdj[2] +
+      wRYGC.w * uSelectiveAdj[3] +
+      wBM.x * uSelectiveAdj[4] +
+      wBM.y * uSelectiveAdj[5] +
+      wW * uSelectiveAdj[6] +
+      wN * uSelectiveAdj[7] +
+      wK * uSelectiveAdj[8];
+    totalAdj *= amount;
+
+    float saturation = chroma > 0.0001
+      ? (L > 0.5 ? chroma / max(2.0 - maxC - minC, 0.0001) : chroma / max(maxC + minC, 0.0001))
+      : 0.0;
+
+    vec3 hsl = vec3(
+      fract(hue + totalAdj.x),
+      clamp(saturation + totalAdj.y, 0.0, 1.0),
+      clamp(L + totalAdj.z, 0.0, 1.0)
+    );
+    return clamp(hslToRgb(hsl), 0.0, 1.0);
   }
 
   float valueNoise(vec3 p) {
@@ -129,7 +222,7 @@ const VERT = `
       pos = rotateZ(rotateY(rotateX(gridPos, uGridRotation.x), uGridRotation.y), uGridRotation.z);
     }
 
-    vColor = color;
+    vColor = applySelectiveColor(color);
     vec4 world = modelMatrix * vec4(pos, 1.0);
     world.xyz += normalize(mat3(modelMatrix) * uConveyorAxis) * conveyorOffset;
     vec4 mv = viewMatrix * world;
@@ -297,6 +390,12 @@ export function createPointCloud(settings: CloudSettings, count: number): PointC
       uConveyorAxis: { value: conveyorAxis },
       uFluid: { value: null },
       uFluidInfluence: { value: settings.fluidInfluence },
+      uSelectiveAmount: { value: settings.colorCorrection?.amount ?? 0 },
+      uSelectiveAdj: {
+        value: Array.from({ length: 9 }, (_, i) =>
+          new THREE.Vector3(...(settings.colorCorrection?.ranges[i] ?? [0, 0, 0])),
+        ),
+      },
       uCausticsStrength: { value: caustics.strength },
       uCausticsScale: { value: caustics.scale },
       uCausticsPower: { value: caustics.power },

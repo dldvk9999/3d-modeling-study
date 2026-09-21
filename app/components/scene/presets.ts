@@ -46,8 +46,7 @@ export type VolumeSettings = {
   };
   /** seconds for one pass through the clip; the original's clips are 1s */
   duration?: number;
-  /** measure brightness on the stored (sRGB) values rather than linear ones */
-  srgbLuma?: boolean;
+  /** measure brightness on the stored (sRGB) values rather than linear ones */
 };
 
 export type CloudSettings = {
@@ -80,6 +79,10 @@ export type CloudSettings = {
   grid: { enabled: boolean; size: number; strength: number; mix: Vec3; rotation: Vec3 };
   conveyor: { enabled: boolean; speed: number; depth: number; rotation: Vec3; near: number; far: number };
   fluidInfluence: number;
+  /** the original's selective colour grade: nine ranges (reds, yellows, greens,
+   *  cyans, blues, magentas, whites, neutrals, blacks) of hue turn, saturation
+   *  and lightness offsets */
+  colorCorrection: { amount: number; ranges: Vec3[] } | null;
   caustics: {
     strength: number;
     scale: number;
@@ -132,9 +135,6 @@ export type CameraSettings = {
 };
 
 export type SectionPreset = {
-  /** how the layers are composited: "display" as the original does, "linear"
-   *  for Agentic, whose stand-ins were tuned that way */
-  space: "display" | "linear";
   camera: CameraSettings;
   backdrop: Backdrop;
   cloud: CloudSettings;
@@ -146,8 +146,7 @@ export type SectionPreset = {
 const noGrid = { enabled: false, size: 1, strength: 0, mix: [0, 0, 0] as Vec3, rotation: [0, 0, 0] as Vec3 };
 
 export const PRESETS: Record<string, SectionPreset> = {
-  agentic: {
-    space: "linear",
+  agentic: {
     camera: {
       position: [-0.012337694942119056, 0.07944265448797339, -0.44905051315225064],
       target: [0.2057636663094521, -0.0705398556730998, 0.5073804838572582],
@@ -185,6 +184,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: noGrid,
       conveyor: { enabled: true, speed: -0.2, depth: 4.544303797468353, rotation: [0, 0, 0], near: 0, far: 7.974683544303791 },
       fluidInfluence: 0.6,
+      colorCorrection: null,
       caustics: { strength: 0.41139240506329117, scale: 1, axisScale: [2, 1, 1], speed: [0, 0, 0.5], power: 8, sparkle: 0, color: [1, 0.9725490196078431, 0.9333333333333333] },
     },
     volumes: [
@@ -212,8 +212,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         fluidDepthStrength: [3, -2],
         hsl: [0, 0, 0],
         grid: { columns: 3, rows: 3, spacing: [0.815, 0.9], randomTimeOffset: 0.87, outerOpacity: 0.24 },
-        duration: 5.94,
-        srgbLuma: true,
+        duration: 5.94,
       },
     ],
     post: {
@@ -227,8 +226,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.35, saturation: 0.8, speed: 0.02 },
   },
 
-  sidekick: {
-    space: "display",
+  sidekick: {
     camera: {
       position: [-0.065, -0.838, 1.385],
       target: [-0.763, -0.698, 0.086],
@@ -258,6 +256,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: noGrid,
       conveyor: { enabled: true, speed: 0.3, depth: 6, rotation: [0, 0.746, 0], near: 0.063, far: 3 },
       fluidInfluence: 0.6,
+      colorCorrection: {
+        amount: 1,
+        ranges: [[0.5, -1, 0.18], [0, 0, 0], [0.0111, 0.15, 0], [0, 0, 0], [0, 0, 0], [0, -1, 0.07], [0, -0.41, -0.51], [0.5, 0, -0.32], [0.225, -0.05, 0.22]],
+      },
       caustics: { strength: 5, scale: 2, axisScale: [1, 1, 10], speed: [-0.15, -0.1, -0.2], power: 10, sparkle: 0, color: [0.502, 0.306, 0.871] },
     },
     volumes: [
@@ -321,8 +323,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0, saturation: 1, speed: 0.2 },
   },
 
-  online: {
-    space: "display",
+  online: {
     camera: {
       position: [-0.043, -0.246, 0.52],
       target: [-0.085, -0.161, 0.015],
@@ -361,6 +362,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: noGrid,
       conveyor: { enabled: true, speed: 0.06, depth: 0.051, rotation: [0, 0, 0], near: 0, far: 2.532 },
       fluidInfluence: 0.5,
+      colorCorrection: {
+        amount: 0.5316,
+        ranges: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0.15]],
+      },
       caustics: { strength: 0.6, scale: 3, axisScale: [1, 1, 1], speed: [0.1, -0.1, -0.05], power: 10, sparkle: 0, color: [0.776, 0.722, 0.639] },
     },
     volumes: [
@@ -425,8 +430,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.4, saturation: 0.87, speed: 0.1 },
   },
 
-  retail: {
-    space: "display",
+  retail: {
     camera: {
       position: [-0.484, -0.689, 0.884],
       target: [-0.281, -0.672, 0.421],
@@ -465,6 +469,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: noGrid,
       conveyor: { enabled: true, speed: 0.087, depth: 0.076, rotation: [0, 0, 0], near: 0.525, far: 0.823 },
       fluidInfluence: 0.5,
+      colorCorrection: {
+        amount: 1,
+        ranges: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0.02]],
+      },
       caustics: { strength: 0.4, scale: 1.519, axisScale: [0.5, 1, 0.5], speed: [0.1, -0.1, -0.1], power: 2.5, sparkle: 0, color: [0.89, 0.847, 0.737] },
     },
     volumes: [
@@ -528,8 +536,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.25, saturation: 0.91, speed: 0.15 },
   },
 
-  marketing: {
-    space: "display",
+  marketing: {
     camera: {
       position: [0.534, 0.23, -0.653],
       target: [0.052, 0.307, 1.482],
@@ -559,6 +566,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: { enabled: true, size: 0.399, strength: 0.54, mix: [0.54, 0.19, 0.39], rotation: [0, 3.47, 0] },
       conveyor: { enabled: true, speed: -0.4, depth: 4.544, rotation: [0, 0, 0], near: 0, far: 7.975 },
       fluidInfluence: 0.6,
+      colorCorrection: {
+        amount: 1,
+        ranges: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, -0.58, 0], [0, 0, 0]],
+      },
       caustics: { strength: 0.411, scale: 1, axisScale: [2, 1, 1], speed: [0, 0, 0.5], power: 8, sparkle: 0, color: [1, 0.973, 0.933] },
     },
     volumes: [
@@ -599,8 +610,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.5, saturation: 0.6, speed: 0.06 },
   },
 
-  operations: {
-    space: "display",
+  operations: {
     camera: {
       position: [-1.721, -0.03, -0.369],
       target: [-0.335, -0.008, -0.396],
@@ -639,6 +649,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: noGrid,
       conveyor: { enabled: true, speed: 0.443, depth: 1.203, rotation: [0, 0, 0], near: 0, far: 1.177 },
       fluidInfluence: 0.4,
+      colorCorrection: {
+        amount: 0.8481,
+        ranges: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [-0.35, 1, 0], [0.0667, -1, 0], [0.5, -1, -0.3], [0, -1, 0]],
+      },
       caustics: { strength: 2, scale: 3, axisScale: [2, 2.2, 2], speed: [0.1, -0.1, -0.05], power: 10, sparkle: 0, color: [0.525, 0.745, 0.678] },
     },
     volumes: [
@@ -678,8 +692,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.3, saturation: 0.88, speed: 0.15 },
   },
 
-  "shop-app": {
-    space: "display",
+  "shop-app": {
     camera: {
       position: [-0.126, 0.384, 1.864],
       target: [-0.126, 0.369, -0.056],
@@ -709,6 +722,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: noGrid,
       conveyor: { enabled: true, speed: -2, depth: 4.494, rotation: [0, 0.44, 0], near: 1.203, far: 20 },
       fluidInfluence: 0.4,
+      colorCorrection: null,
       caustics: { strength: 5, scale: 0.158, axisScale: [1.25, 1.09, 2.4], speed: [-0.11, -0.04, -0.04], power: 5.443, sparkle: 0, color: [0.373, 0.294, 1] },
     },
     volumes: [
@@ -748,8 +762,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.3, saturation: 0.8, speed: 0.1 },
   },
 
-  payments: {
-    space: "display",
+  payments: {
     camera: {
       position: [-0.597, -0.443, 0.532],
       target: [-0.685, -0.397, -0.35],
@@ -779,6 +792,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: { enabled: true, size: 0.496, strength: 0.94, mix: [0.58, 0.16, 0.94], rotation: [0, 0.94, 1.76] },
       conveyor: { enabled: false, speed: 0.08, depth: 1, rotation: [0, 0.37, 0], near: 0, far: 0 },
       fluidInfluence: 0.5,
+      colorCorrection: null,
       caustics: { strength: 1.2, scale: 3, axisScale: [2, 3.14, 2.4], speed: [-0.1, -0.1, -0.2], power: 5, sparkle: 0.316, color: [0.388, 0.635, 1] },
     },
     volumes: [
@@ -842,8 +856,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.35, saturation: 0.8, speed: 0.1 },
   },
 
-  finance: {
-    space: "display",
+  finance: {
     camera: {
       position: [-0.305, 0.025, 0.909],
       target: [-0.349, 0.029, -0.543],
@@ -882,6 +895,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: { enabled: true, size: 0.037, strength: 0.1, mix: [0.1, 0.1, 0.1], rotation: [0, 0, 0] },
       conveyor: { enabled: true, speed: 0.443, depth: 1.203, rotation: [0, 0, 0], near: 3.608, far: 0.759 },
       fluidInfluence: 0.8,
+      colorCorrection: {
+        amount: 1,
+        ranges: [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [-0.35, 1, 0], [0.0667, -1, 0], [0.5, -1, -0.3], [0, -1, 0]],
+      },
       caustics: { strength: 5, scale: 2, axisScale: [1, 2, 2.4], speed: [0.1, -0.5, -0.05], power: 8, sparkle: 0, color: [0.114, 0.627, 1] },
     },
     volumes: [
@@ -921,8 +938,7 @@ export const PRESETS: Record<string, SectionPreset> = {
     behind: { darken: 0.5, saturation: 0.7, speed: 0.2 },
   },
 
-  developer: {
-    space: "display",
+  developer: {
     camera: {
       position: [0.376, -0.053, 0.809],
       target: [0.11, -0.019, -0.168],
@@ -961,6 +977,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       grid: { enabled: true, size: 0.041, strength: 1, mix: [1, 1, 1], rotation: [0, 0, 0] },
       conveyor: { enabled: true, speed: 0.5, depth: 10, rotation: [-0.06, -0.62, 0], near: 0.127, far: 4.127 },
       fluidInfluence: 0.6,
+      colorCorrection: null,
       caustics: { strength: 2, scale: 0.981, axisScale: [1, 1, 1], speed: [0.1, -0.05, -0.05], power: 10, sparkle: 0, color: [1, 1, 1] },
     },
     volumes: [

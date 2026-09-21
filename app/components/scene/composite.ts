@@ -96,12 +96,20 @@ const LAYERS_FRAG = `
     }
 
     vec4 background = texture2D(tBackground, vUv);
-    color = uBackgroundNormal > 0.5 ? color * (1.0 - background.a) + background.rgb : color + background.rgb;
-    alpha += clamp(background.a, 0.0, 1.0) * (1.0 - alpha);
+    if (uBackgroundNormal > 0.5) {
+      color = color * (1.0 - background.a) + background.rgb;
+      alpha += clamp(background.a, 0.0, 1.0) * (1.0 - alpha);
+    } else {
+      color += background.rgb;
+    }
 
     vec4 points = texture2D(tPoints, vUv);
-    color = uPointsNormal > 0.5 ? color * (1.0 - points.a) + points.rgb : color + points.rgb;
-    alpha += clamp(points.a, 0.0, 1.0) * (1.0 - alpha);
+    if (uPointsNormal > 0.5) {
+      color = color * (1.0 - points.a) + points.rgb;
+      alpha += clamp(points.a, 0.0, 1.0) * (1.0 - alpha);
+    } else {
+      color += points.rgb;
+    }
 
     gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
   }
@@ -181,7 +189,6 @@ const OUTPUT_FRAG = `
   uniform float uLoadFade;
   uniform float uBehindDarken;
   uniform float uBehindSaturation;
-  uniform float uDisplayReferred;
 
   ${THREE.ShaderChunk.tonemapping_pars_fragment}
 
@@ -229,11 +236,22 @@ const OUTPUT_FRAG = `
     vec2 screenUv = vec2(vUv.x, vUv.y * uScreenScale + uScreenOffset);
 
     vec4 foreground = texture2D(tForeground, vUv);
-    color = uForegroundNormal > 0.5 ? color * (1.0 - foreground.a) + foreground.rgb : color + foreground.rgb;
-    alpha += clamp(foreground.a, 0.0, 1.0) * (1.0 - alpha);
+    if (uForegroundNormal > 0.5) {
+      color = color * (1.0 - foreground.a) + foreground.rgb;
+      alpha += clamp(foreground.a, 0.0, 1.0) * (1.0 - alpha);
+    } else {
+      color += foreground.rgb;
+    }
 
     if (uNoiseAmount > 0.0001) {
       color += (rand(floor(gl_FragCoord.xy) + vec2(uNoiseTime * 59.0, uNoiseTime * 83.0)) - 0.5) * uNoiseAmount;
+    }
+
+    if (uGradient > 0.5) {
+      vec3 gradient = gradientColor(screenUv) * (1.0 - clamp(uGradientDarken, 0.0, 1.0));
+      gradient *= mix(0.05, 1.0, clamp(uLoadFade, 0.0, 1.0));
+      vec3 background = gradient;
+      color = background * (1.0 - clamp(alpha, 0.0, 1.0)) + color;
     }
 
     if (uVignetteAmount > 0.0) {
@@ -241,26 +259,14 @@ const OUTPUT_FRAG = `
       v.x *= uVignetteAspect;
       float edge = smoothstep(uVignetteRadius - max(uVignetteSoftness, 0.0001), uVignetteRadius, length(v));
       float shade = mix(1.0, 1.0 - uVignetteAmount, edge);
-      color *= mix(1.0, shade, smoothstep(0.5, 1.0, screenUv.y));
+      color *= mix(1.0, shade, mix(0.5, 1.0, clamp(screenUv.y, 0.0, 1.0)));
     }
 
-    if (uGradient > 0.5) {
-      vec3 gradient = gradientColor(screenUv) * (1.0 - clamp(uGradientDarken, 0.0, 1.0));
-      gradient *= mix(0.05, 1.0, clamp(uLoadFade, 0.0, 1.0));
-      vec3 background = uDisplayReferred > 0.5 ? gradient : pow(gradient, vec3(2.2));
-      color = mix(background, color, clamp(alpha, 0.0, 1.0));
-    }
 
-    if (uDisplayReferred > 0.5) {
-      // the tune-down happens on the display values, then decode and tone map
-      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-      color = mix(vec3(luma), color, uBehindSaturation) * (1.0 - uBehindDarken);
-      color = NeutralToneMapping(sRGBToLinear(color));
-    } else {
-      color = NeutralToneMapping(max(color, vec3(0.0)));
-      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-      color = mix(vec3(luma), color, uBehindSaturation) * (1.0 - uBehindDarken);
-    }
+    // the tune-down happens on the display values, then decode and tone map
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    color = mix(vec3(luma), color, uBehindSaturation) * (1.0 - uBehindDarken);
+    color = NeutralToneMapping(sRGBToLinear(color));
     gl_FragColor = vec4(linearToSRGB(color), 1.0);
   }
 `;
@@ -324,7 +330,6 @@ export function createComposite(
     backgroundNormal: boolean;
     pointsNormal: boolean;
     foregroundNormal: boolean;
-    displayReferred: boolean;
   },
 ): Composite {
   const { backdrop, post } = options;
@@ -417,7 +422,6 @@ export function createComposite(
     uLoadFade: { value: 0 },
     uBehindDarken: { value: 0 },
     uBehindSaturation: { value: 1 },
-    uDisplayReferred: { value: options.displayReferred ? 1 : 0 },
   });
 
   const clearTrails = () => {

@@ -148,7 +148,7 @@ function buildCards(count: number, rand: () => number) {
     let x: number;
     let y: number;
     let bright: number;
-    if (roll < 0.46) {
+    if (roll < 0.3) {
       [x, y] = roundedRectPoint(card.cx, card.cy, card.w, card.h, 0.16, rand);
       x += (rand() - 0.5) * 0.04;
       y += (rand() - 0.5) * 0.04;
@@ -317,6 +317,12 @@ function buildStorefront(count: number, rand: () => number) {
   ];
   const lengthA = Math.hypot(sideA[0], sideA[1]);
   const lengthB = Math.hypot(sideB[0], sideB[1]);
+  // where the camera stands in these coordinates; a scan is densest where it
+  // passed closest, so the long front thins out toward its far end
+  const eye = [-0.46, -0.52];
+  const towardCorner = (r: number) => r ** 2.6;
+  // a scan lands on surfaces, so every part of the store is a thin sheet
+  const skin = () => (rand() - 0.5) * 0.008;
 
   // what's on display: warm fabric, soft teal and pink, dark shelving
   const goods = (x: number, y: number, z: number): [number, number, number] => {
@@ -330,83 +336,79 @@ function buildStorefront(count: number, rand: () => number) {
 
   while (!out.full) {
     const roll = rand();
-    const jitter = () => (rand() - 0.5) * 0.012;
-    if (roll < 0.42) {
-      // the display crowding each glass front, a little way inside it
-      const y = ground + 0.03 + rand() * (eaves - ground - 0.04);
-      let x: number;
-      let z: number;
-      if (rand() < 0.45) {
-        const s = 0.1 + rand() * 0.1;
-        [x, z] = at(s, rand());
-      } else {
-        const t = rand() * 0.09;
-        [x, z] = at(rand(), t);
-      }
-      x += jitter();
-      z += jitter();
-      const shade = 0.85 + rand() * 0.2;
-      const [r, g, b] = goods(x, y, z);
-      out.push(x, y, z, r * shade, g * shade, b * shade);
-    } else if (roll < 0.47) {
-      // mullions and the glass itself, along both fronts
+    if (roll < 0.22) {
+      // the glass fronts, their mullions catching the light
       const onA = rand() < lengthA / (lengthA + lengthB);
-      const along = rand();
+      const along = onA ? rand() : towardCorner(rand());
       const y = ground + rand() * (eaves - ground);
       const [x, z] = onA ? at(along, 0) : at(0, along);
       const spacing = onA ? 0.08 / lengthA : 0.08 / lengthB;
-      const mullion = Math.abs(((along / spacing) % 1) - 0.5) > 0.4;
-      if (mullion) out.push(x, y, z, 0.8, 0.74, 0.62);
-      else out.push(x, y, z, 0.34, 0.33, 0.27);
-    } else if (roll < 0.6) {
-      // the roof slab, overhanging the fronts, lighter on top than beneath
-      const s = -0.1 + rand() * 1.15;
-      const t = -0.08 + rand() * 1.13;
+      const mullion = Math.abs(((along / spacing) % 1) - 0.5) > 0.38;
+      if (mullion) out.push(x + skin(), y, z + skin(), 0.82, 0.76, 0.64);
+      else out.push(x + skin(), y, z + skin(), 0.34, 0.33, 0.27);
+    } else if (roll < 0.48) {
+      // racks of goods inside, standing parallel to each front
+      const alongA = rand() < 0.45;
+      const lane = [0.16, 0.34, 0.6][Math.floor(rand() * 3)];
+      const along = towardCorner(rand());
+      const [x, z] = alongA ? at(lane, along) : at(along, lane * 0.55);
+      const y = ground + 0.01 + rand() * (eaves - ground - 0.06);
+      const jx = x + skin() * 2;
+      const jz = z + skin() * 2;
+      const shade = 0.85 + rand() * 0.2;
+      const [r, g, b] = goods(jx, y, jz);
+      out.push(jx, y, jz, r * shade, g * shade, b * shade);
+    } else if (roll < 0.52) {
+      // the far walls, dim behind the goods
+      const onA = rand() < 0.5;
+      const along = towardCorner(rand());
+      const [x, z] = onA ? at(along, 1) : at(1, along);
+      const y = ground + rand() * (eaves - ground);
+      out.push(x + skin(), y, z + skin(), 0.33, 0.3, 0.26);
+    } else if (roll < 0.68) {
+      // the roof slab, overhanging both fronts: bright on top, dim beneath
+      const s = -0.16 + rand() * 1.2;
+      const t = -0.12 + towardCorner(rand()) * 1.2;
       const [x, z] = at(s, t);
-      const top = rand() < 0.3;
-      const y = top ? eaves + 0.02 + rand() * 0.012 : eaves + rand() * 0.02;
+      const top = rand() < 0.45;
+      const y = (top ? eaves + 0.022 : eaves) + skin();
       const shade = 0.9 + fbm3(x * 12, 0, z * 12) * 0.2;
-      if (top) out.push(x, y, z, 0.5 * shade, 0.49 * shade, 0.43 * shade);
-      else out.push(x, y, z, 0.42 * shade, 0.41 * shade, 0.34 * shade);
-    } else if (roll < 0.64) {
+      if (top) out.push(x, y, z, 0.52 * shade, 0.51 * shade, 0.45 * shade);
+      else out.push(x, y, z, 0.4 * shade, 0.39 * shade, 0.33 * shade);
+    } else if (roll < 0.74) {
       // the floor inside
-      const [x, z] = at(rand(), rand());
-      out.push(x, ground + rand() * 0.02, z, 0.41, 0.35, 0.3);
-    } else if (roll < 0.82) {
-      // the plaza, everywhere the store isn't
-      const x = -0.8 + rand() * 1.34;
-      const z = -1.8 + rand() * 1.5;
+      const [x, z] = at(rand(), towardCorner(rand()));
+      out.push(x, ground + skin(), z, 0.41, 0.35, 0.3);
+    } else if (roll < 0.94) {
+      // the ground the capture covers, in front of the store and around the
+      // camera, densest where the camera stands
+      const angle = rand() * Math.PI * 2;
+      const reach = 0.95 * rand() ** 0.72;
+      const x = eye[0] + Math.cos(angle) * reach;
+      const z = eye[1] + Math.sin(angle) * reach;
+      if (x < -0.8 || x > 0.54 || z < -1.8 || z > -0.3) continue;
       const dx = x - corner[0];
       const dz = z - corner[1];
       const s = (dx * sideA[0] + dz * sideA[1]) / (lengthA * lengthA);
       const t = (dx * sideB[0] + dz * sideB[1]) / (lengthB * lengthB);
       if (s > 0 && t > 0 && s < 1 && t < 1) continue;
       const shade = 0.85 + fbm3(x * 10, 0, z * 10) * 0.3;
-      out.push(x, ground - rand() * 0.01, z, 0.4 * shade, 0.37 * shade, 0.36 * shade);
-    } else if (roll < 0.86) {
+      out.push(x, ground + skin(), z, 0.4 * shade, 0.37 * shade, 0.36 * shade);
+    } else if (roll < 0.97) {
       // a bench out front
       const u = rand();
-      const x = -0.005 + u * 0.075 + jitter();
-      const z = -0.455 + u * 0.15 + jitter();
+      const x = -0.005 + u * 0.075 + skin();
+      const z = -0.455 + u * 0.15 + skin();
       out.push(x, -0.085 + rand() * 0.015, z, 0.84, 0.8, 0.72);
-    } else if (roll < 0.9) {
+    } else {
       // a flowering shrub against the far corner
       const u = rand() * Math.PI * 2;
       const r = 0.1 * Math.cbrt(rand());
       out.push(-0.44 + Math.cos(u) * r, ground + rand() * 0.3, -1.56 + Math.sin(u) * r * 0.6, 0.76, 0.42, 0.48);
-    } else {
-      // dust in the air around the store, catching its colours
-      const x = -0.8 + rand() * 1.34;
-      const y = ground + rand() * (eaves - ground + 0.05);
-      const z = -1.8 + rand() * 1.5;
-      out.push(x, y, z, 0.48, 0.4, 0.36);
     }
   }
   return out;
 }
-
-// Wispy filaments: random walks bending through a noise field, bright white
-// cores with magenta at the tips.
 function buildNebula(count: number, rand: () => number) {
   const out = new Writer(count);
   // the capture's bounds, held by two unlit strays so the loader fits the same
@@ -470,13 +472,20 @@ function buildGlobe(count: number, rand: () => number) {
     const nx = Math.sin(v) * Math.cos(u);
     const ny = Math.cos(v);
     const nz = Math.sin(v) * Math.sin(u);
-    const land = fbm3(nx * 2.2 + 5, ny * 2.2 + 5, nz * 2.2 + 5) > 0.54;
-    const cloud = fbm3(nx * 4 + 20, ny * 4 + 20, nz * 4 + 20) > 0.66;
-    const ice = Math.abs(ny) > 0.88;
-    let color: [number, number, number];
-    if (cloud || ice) color = [0.85, 0.9, 0.95];
-    else if (land) color = [0.72, 0.62, 0.48];
-    else color = [0.22, 0.42, 0.62];
+    const landiness = fbm3(nx * 2.2 + 5, ny * 2.2 + 5, nz * 2.2 + 5);
+    const cloudiness = fbm3(nx * 4 + 20, ny * 4 + 20, nz * 4 + 20);
+    const ice = Math.max(0, Math.abs(ny) - 0.82) / 0.18;
+    const land = Math.max(0, Math.min(1, (landiness - 0.5) * 6));
+    const veil = Math.max(0, Math.min(1, (cloudiness - 0.55) * 4)) * 0.85 + ice;
+    // daylight falls across the globe, so the far side sits darker
+    const light = 0.82 + 0.3 * Math.max(0, nx * -0.4 + ny * 0.35 + nz * 0.85);
+    const grain = 0.9 + 0.2 * rand();
+    const sea: [number, number, number] = [0.32, 0.47, 0.6];
+    const soil: [number, number, number] = [0.74, 0.66, 0.52];
+    const color = [0, 1, 2].map((k) => {
+      const base = sea[k] + (soil[k] - sea[k]) * land;
+      return Math.min(1, (base + (0.95 - base) * Math.min(1, veil)) * light * grain);
+    }) as [number, number, number];
     const r = radius * (1 - rand() * 0.02);
     out.push(nx * r, ny * r - 0.0, nz * r - 1.0, color[0], color[1], color[2]);
   }

@@ -176,22 +176,25 @@ const BODIES: Record<PainterId, string> = {
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec3 col = vec3(0.02, 0.02, 0.035) + vec3(0.05, 0.045, 0.08) * exp(-dot(p, p) * 3.0);
+      float floorLine = -0.17;
+      float reflected = step(p.y, floorLine);
+      p.y = mix(p.y, 2.0 * floorLine - p.y, reflected);
       vec2 cell = floor(uv * vec2(aspect, 1.0) * 110.0);
       float dust = step(0.975, hash2(cell + floor(phase * 10.0) * 7.0))
         * smoothstep(0.6, 0.15, uv.y) * smoothstep(0.75, 0.25, uv.x);
-      col += vec3(0.85, 0.75, 1.0) * dust * 0.9;
+      col += vec3(0.85, 0.75, 1.0) * dust * 1.3;
 
       float spacing = 0.07;
       float index = floor(p.x / spacing + 0.5);
-      if (abs(index) <= 5.0) {
+      if (abs(index) <= 6.0) {
         float x = p.x - index * spacing;
-        float envelope = 1.0 - abs(index) / 6.0;
+        float envelope = 1.0 - abs(index) / 7.2;
         float pulse = 0.6 + 0.4 * sin(TAU * (phase * 2.0 + hash1(index * 3.7 + 1.0)));
-        float halfHeight = 0.34 * envelope * pulse + 0.015;
+        float halfHeight = 0.42 * envelope * pulse + 0.02;
         vec2 q = vec2(x, max(abs(p.y) - halfHeight, 0.0));
-        float d = length(q) - 0.024;
+        float d = length(q) - 0.034;
         float bar = smoothstep(0.004, -0.004, d);
-        float glow = exp(-max(d, 0.0) * 40.0) * 0.25;
+        float glow = exp(-max(d, 0.0) * 30.0) * 0.35;
         // each bar runs between two pastels, bottom to top
         float pick = hash1(index * 1.7 + 4.0);
         vec3 lilac = vec3(0.7, 0.46, 1.0);
@@ -201,7 +204,7 @@ const BODIES: Record<PainterId, string> = {
         vec3 top = pick < 0.3 ? pink : pick < 0.6 ? lilac : pick < 0.8 ? cream : sky;
         vec3 bottom = pick < 0.3 ? cream : pick < 0.6 ? pink : pick < 0.8 ? sky : lilac;
         float t = clamp(p.y / max(halfHeight, 0.001) * 0.5 + 0.5, 0.0, 1.0);
-        vec3 tone = mix(bottom, top, t);
+        vec3 tone = mix(bottom, top, t) * mix(1.0, 0.6, reflected);
         col = mix(col, tone, bar) + tone * glow * (1.0 - bar);
       }
       return col;
@@ -212,15 +215,15 @@ const BODIES: Record<PainterId, string> = {
   pills: `
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
-      vec3 col = vec3(0.1) * step(uv.x, 0.55);
+      vec3 col = vec3(0.022) * step(uv.x, 0.55);
       vec2 loop = loopVec(phase);
       vec2 centre = vec2((0.37 - 0.5) * aspect, 0.0) + vec2(0.012 * loop.x, 0.02 * loop.y);
       float scale = 0.7 + 0.3 * (0.5 + 0.5 * sin(TAU * phase));
       vec2 q = (p - centre) / scale;
-      float d = sdRoundBox(q, vec2(0.15, 0.032), 0.032);
+      float d = sdRoundBox(q, vec2(0.115, 0.028), 0.028);
       float body = fill(d);
       col = mix(col, vec3(0.07, 0.06, 0.1), body);
-      col += vec3(0.5, 0.3, 1.0) * exp(-abs(d) * 110.0) * 1.1;
+      col += vec3(0.5, 0.3, 1.0) * exp(-abs(d) * 190.0) * 0.55;
       for (int i = 0; i < 3; i++) {
         float fi = float(i);
         vec2 icon = vec2(-0.09 + fi * 0.075, 0.0);
@@ -241,11 +244,11 @@ const BODIES: Record<PainterId, string> = {
       float slot = floor(turn * count);
       float f = fract(turn * count);
       float present = smoothstep(0.02, 0.1, abs(angle - 0.5));
-      float ring = smoothstep(0.12, 0.135, r) * smoothstep(0.34, 0.325, r);
+      float ring = smoothstep(0.115, 0.13, r) * smoothstep(0.41, 0.395, r);
       float edges = smoothstep(0.0, 0.07, f) * smoothstep(1.0, 0.93, f);
       vec3 tint = 0.72 + 0.26 * cos(TAU * (vec3(0.0, 0.33, 0.67) + angle + 0.15));
       tint = mix(vec3(1.0), tint, 0.75);
-      tint *= 0.9 + 0.2 * (r - 0.12) / 0.22;
+      tint *= 1.05 + 0.2 * (r - 0.12) / 0.29;
       float shade = 0.78 + 0.25 * (1.0 - abs(f - 0.5) * 2.0) + (r - 0.23) * 0.8;
       // an embossed mark on every face
       float mark = smoothstep(0.012, 0.004, abs(length(vec2((f - 0.5) * 0.14, r - 0.23)) - 0.035));
@@ -281,12 +284,12 @@ const BODIES: Record<PainterId, string> = {
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 loop = loopVec(phase);
       vec2 q = uv + vec2(0.015 * loop.x, 0.008 * loop.y);
-      vec3 col = mix(vec3(0.98, 0.88, 0.8), vec3(0.88, 0.84, 0.9), smoothstep(0.5, 1.0, q.y));
+      vec3 col = mix(vec3(0.74, 0.65, 0.58), vec3(0.64, 0.6, 0.66), smoothstep(0.5, 1.0, q.y));
       // lavender paving
       col = mix(col, mix(vec3(0.46, 0.43, 0.52), vec3(0.62, 0.58, 0.66), q.y / 0.32), step(q.y, 0.32));
 
       float glass = step(0.06, q.x) * step(q.x, 0.86) * step(0.32, q.y) * step(q.y, 0.72);
-      vec3 goods = mix(vec3(0.96, 0.8, 0.66), vec3(0.62, 0.78, 0.72), smoothstep(0.45, 0.7, fbm3(vec3(q * 7.0, 1.0))));
+      vec3 goods = mix(vec3(0.8, 0.62, 0.48), vec3(0.47, 0.6, 0.55), smoothstep(0.45, 0.7, fbm3(vec3(q * 7.0, 1.0))));
       goods = mix(goods, vec3(0.98, 0.7, 0.76), smoothstep(0.64, 0.8, fbm3(vec3(q * 9.0 + 3.0, 2.0))) * 0.6);
       // a big orange drape across the middle
       float drape = smoothstep(0.05, 0.0, abs(q.y - 0.56 - 0.05 * sin(q.x * 14.0)) - 0.03);
@@ -312,7 +315,7 @@ const BODIES: Record<PainterId, string> = {
       col = mix(col, vec3(0.3, 0.24, 0.2), step(abs(q.x - 0.92), 0.01) * step(0.3, q.y) * step(q.y, 0.7));
       // pink flowers along the left
       col = mix(col, vec3(0.95, 0.6, 0.72), smoothstep(0.62, 0.72, fbm3(vec3(q * 18.0, 5.0))) * step(q.x, 0.12) * step(0.25, q.y) * step(q.y, 0.45));
-      return col;
+      return col * 0.78;
     }
   `,
 
@@ -332,8 +335,8 @@ const BODIES: Record<PainterId, string> = {
         col[c] = pow(noise3(q) * 0.7 + noise3(q * 2.1) * 0.3, 4.0);
       }
       col = mix(vec3(dot(col, vec3(0.3333))), col, 0.55);
-      col *= exp(-r * 1.4) * 3.2;
-      col += vec3(1.0, 0.98, 0.95) * (exp(-r * r * 60.0) * 0.9 + exp(-r * 6.0) * 0.18);
+      col *= exp(-r * 0.8) * 3.6;
+      col += vec3(1.0, 0.98, 0.95) * (exp(-r * r * 40.0) * 1.0 + exp(-r * 3.0) * 0.3);
       return clamp(col, 0.0, 1.0);
     }
   `,
@@ -434,7 +437,7 @@ const BODIES: Record<PainterId, string> = {
         col = surface * light + vec3(0.4, 0.6, 1.0) * pow(1.0 - z, 3.0) * 0.8;
       }
       col += vec3(0.3, 0.5, 1.0) * smoothstep(1.08, 1.0, r) * smoothstep(0.96, 1.0, r) * 0.6;
-      return col;
+      return col * 1.12;
     }
   `,
 
@@ -528,7 +531,7 @@ const BODIES: Record<PainterId, string> = {
   // small lit cubes
   bars: `
     vec3 paint(vec2 uv, float phase, float aspect) {
-      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+      vec2 p = (uv - 0.5) * vec2(aspect, 1.0) * 1.25;
       vec2 loop = loopVec(phase);
       vec3 col = vec3(0.01);
       float x = p.x + 0.06 * loop.y;
@@ -541,7 +544,7 @@ const BODIES: Record<PainterId, string> = {
       float gaps = smoothstep(0.0, 0.08, cell.x) * smoothstep(1.0, 0.92, cell.x) * smoothstep(0.0, 0.1, cell.y) * smoothstep(1.0, 0.9, cell.y);
       float body = step(0.0, row) * step(row, 7.0) * smoothstep(0.02, -0.02, abs(x) - halfWidth);
       float shade = 0.8 + 0.2 * hash2(vec2(floor((x + 2.0) / 0.1), row));
-      col = mix(col, vec3(1.0, 0.98, 0.86) * shade, body * (0.5 + 0.5 * gaps));
+      col = mix(col, vec3(1.0, 0.9, 0.62) * shade, body * (0.5 + 0.5 * gaps));
       // the glossy floor mirrors the lowest rows
       float mirrorY = floorY - p.y;
       float mirrorRow = floor(mirrorY / rowHeight);
@@ -557,7 +560,7 @@ const BODIES: Record<PainterId, string> = {
         col = mix(col, mix(vec3(0.95), tint, 0.5), cube);
         col += tint * exp(-length(p - at) * 30.0) * 0.25;
       }
-      return clamp(col, 0.0, 1.0);
+      return clamp(col * 1.3, 0.0, 1.0);
     }
   `,
 
@@ -626,9 +629,29 @@ const BODIES: Record<PainterId, string> = {
       vec3 a = shot((q - 0.05) / 0.9, kind);
       vec3 b = shot((q - 0.05) / 0.9, next);
       vec3 photo = mix(a, b, smoothstep(0.85, 1.0, within));
-      return photo * gutter * (1.0 - empty);
+      return photo * gutter * (1.0 - empty) * 0.82;
     }
   `,
+};
+
+// How colourful each stand-in ends up, measured against its clip: the ratio
+// of the clip's mean saturation to the painted one's, so the two match.
+const SATURATION: Record<PainterId, number> = {
+  prism: 1,
+  stripes: 0.47,
+  pills: 1,
+  coins: 0.9,
+  phone: 1,
+  storefront: 1.51,
+  rays: 1,
+  collage: 0.5,
+  globe: 0.36,
+  swirl: 0.92,
+  cards: 0.56,
+  vortex: 0.93,
+  bars: 0.59,
+  screens: 1.85,
+  tiles: 1.48,
 };
 
 export function painterShader(id: PainterId) {
@@ -636,7 +659,10 @@ export function painterShader(id: PainterId) {
 ${PAINTER_PRELUDE}
 ${BODIES[id]}
     void main() {
-      gl_FragColor = vec4(clamp(paint(vUv, uPhase, uAspect), 0.0, 1.0), 1.0);
+      vec3 col = paint(vUv, uPhase, uAspect);
+      float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(luma), col, ${SATURATION[id].toFixed(2)});
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `;
 }

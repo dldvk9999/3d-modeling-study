@@ -96,7 +96,6 @@ const VOLUME_FRAG = `
   uniform float uSteps;
   uniform float uScrubOffset;
   uniform float uLoadFade;
-  uniform float uSrgbLuma;
   uniform vec3 uHsl;
   uniform vec2 uFluidStrength;
   uniform vec2 uFluidDepthStrength;
@@ -171,14 +170,12 @@ const VOLUME_FRAG = `
       // depth is time: a few loops of the clip fit in the box, scrubbed along
       float z = fract(uvw.z * uLoopCount + uScrubOffset + uGridTimeOffset);
       vec4 tex = texture(uVolume, vec3(uvw.x, uvw.y, z));
-      vec3 linear = pow(tex.rgb, vec3(2.2));
-
-      vec3 measured = uSrgbLuma > 0.5 ? tex.rgb : linear;
-      float luma = max(max(measured.r, measured.g), measured.b);
+      tex.rgb = pow(tex.rgb, vec3(2.2));
+      float luma = max(max(tex.r, tex.g), tex.b);
       float density = smoothstep(uThreshold, uThreshold + max(0.0001, uSoftness), luma)
-        * uOpacity * sideFeather * uGridOpacity;
+        * tex.a * uOpacity * sideFeather * uGridOpacity;
       float a = density / steps;
-      accum += applyHsl(linear, uHsl) * uBrightness * a * (1.0 - alpha);
+      accum += applyHsl(tex.rgb, uHsl) * uBrightness * a * (1.0 - alpha);
       alpha += a * (1.0 - alpha);
       if (alpha > 0.96) break;
     }
@@ -226,7 +223,6 @@ export function createLightVolume(
         uSteps: { value: Math.max(8, Math.round(settings.steps * stepScale)) },
         uScrubOffset: { value: 0 },
         uLoadFade: { value: 0 },
-        uSrgbLuma: { value: settings.srgbLuma ? 1 : 0 },
         uHsl: { value: new THREE.Vector3(...settings.hsl) },
         uFluidStrength: { value: new THREE.Vector2(...settings.fluidStrength) },
         uFluidDepthStrength: { value: new THREE.Vector2(...settings.fluidDepthStrength) },
