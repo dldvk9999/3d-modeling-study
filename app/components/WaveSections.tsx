@@ -3,55 +3,87 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 
 // Two full-screen sections pinned on top of each other. Scrolling doesn't move
-// them — it pulls the second one over the first along a rippling edge. The edge
-// isn't a clean cut: a band of glass rides it, refracting and smearing whatever
-// is behind, so the two sections melt into each other instead of snapping.
-const SAMPLES = 64;
-const WAVE_AMPLITUDE = 7; // % of viewport height at the peak of the reveal
-const ZOOM_FROM = 0.92;
+// them — it dissolves the second one over the first the way the original does
+// it: a level edge travelling up the screen, feathered so wide that the two
+// sections overlap across most of the viewport, and pushed around by a
+// drifting fractal noise so the boundary reads as a slow swell rather than a
+// line. The original's own settings for this hand-off are a feather of 0.6
+// and a noise amount of 0.34, in units where the viewport spans -1 to 1.
+const SAMPLES = 96;
+const FEATHER = 0.6;
+const NOISE_AMOUNT = 0.34;
+const NOISE_SCALE_X = 3.5;
+const NOISE_SCALE_Y = 5.5;
 
-function waveAt(x: number, time: number) {
-  const phase = (x / 100) * Math.PI * 2;
-  return (
-    Math.sin(phase * 1.15 + time * 0.9) * 0.62 +
-    Math.sin(phase * 2.3 - time * 1.35) * 0.27 +
-    Math.sin(phase * 4.1 + time * 0.55) * 0.11 +
-    Math.sin(phase * 0.7 - time * 0.4) * 0.22
-  );
+function hash(x: number, y: number) {
+  const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+  return s - Math.floor(s);
 }
 
-function edgeAt(progress: number, time: number, x: number) {
-  const swell = Math.sin(Math.PI * progress) ** 0.7;
-  return (1 - progress) * 100 + waveAt(x, time) * WAVE_AMPLITUDE * swell;
+function valueNoise(x: number, y: number) {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  let fx = x - ix;
+  let fy = y - iy;
+  fx = fx * fx * (3 - 2 * fx);
+  fy = fy * fy * (3 - 2 * fy);
+  const a = hash(ix, iy);
+  const b = hash(ix + 1, iy);
+  const c = hash(ix, iy + 1);
+  const d = hash(ix + 1, iy + 1);
+  const lowerRow = a + (b - a) * fx;
+  const upperRow = c + (d - c) * fx;
+  return lowerRow + (upperRow - lowerRow) * fy;
 }
 
-function revealPath(progress: number, time: number) {
-  const points: string[] = [];
-  for (let i = 0; i <= SAMPLES; i++) {
-    const x = (i / SAMPLES) * 100;
-    points.push(`${x.toFixed(2)}% ${edgeAt(progress, time, x).toFixed(2)}%`);
+function fbm(x: number, y: number) {
+  let value = 0;
+  let amplitude = 0.5;
+  let px = x;
+  let py = y;
+  for (let i = 0; i < 4; i++) {
+    value += valueNoise(px, py) * amplitude;
+    px = px * 2.03 + 17.13;
+    py = py * 2.03 + 17.13;
+    amplitude *= 0.5;
   }
-  points.push("100% 100%", "0% 100%");
-  return `polygon(${points.join(", ")})`;
+  return value;
 }
 
-// a strip that hugs the wave, used as the glass
-function bandPath(
-  progress: number,
-  time: number,
-  above: number,
-  below: number,
-) {
-  const top: string[] = [];
-  const bottom: string[] = [];
-  for (let i = 0; i <= SAMPLES; i++) {
-    const x = (i / SAMPLES) * 100;
-    const y = edgeAt(progress, time, x);
-    top.push(`${x.toFixed(2)}% ${(y - above).toFixed(2)}%`);
-    bottom.push(`${x.toFixed(2)}% ${(y + below).toFixed(2)}%`);
+// where the boundary sits in one column, as a share of the viewport measured
+// down from the top. The noise depends on height as well, so the solve takes
+// a couple of passes to settle.
+function edgeAt(progress: number, x: number) {
+  const travel = 1 + FEATHER + NOISE_AMOUNT;
+  let upY = 1 - progress;
+  for (let i = 0; i < 3; i++) {
+    const noise =
+      (fbm(
+        x * NOISE_SCALE_X + progress * 1.7,
+        upY * NOISE_SCALE_Y + progress * 1.7,
+      ) -
+        0.5) *
+      NOISE_AMOUNT;
+    // the edge runs from below the screen to above it as the reveal completes
+    const edge = travel * (1 - 2 * progress) + noise;
+    const solved = (1 - edge) / 2;
+    upY = upY * 0.4 + solved * 0.6;
   }
-  bottom.reverse();
-  return `polygon(${[...top, ...bottom].join(", ")})`;
+  return (1 - upY) * 100;
+}
+
+// the boundary as a path in pixels, for the mask that blurs it
+function wavePath(progress: number, width: number, height: number) {
+  const parts: string[] = [];
+  for (let i = 0; i <= SAMPLES; i++) {
+    const x = (i / SAMPLES) * width;
+    const y = (edgeAt(progress, i / SAMPLES) / 100) * height;
+    parts.push(`${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  parts.push(`L${width.toFixed(1)},${(height * 2.5).toFixed(1)}`);
+  parts.push(`L0,${(height * 2.5).toFixed(1)}`);
+  parts.push("Z");
+  return parts.join(" ");
 }
 
 export default function WaveSections({
@@ -61,7 +93,7 @@ export default function WaveSections({
   travel = 100,
   hold = 0,
   /** pull the block up over what precedes it, so that content is still on
-   *  screen behind the wave while the new section washes in (svh) */
+   *  screen behind the dissolve while the new section washes in (svh) */
   overlap = 0,
 }: {
   first?: ReactNode;
@@ -72,23 +104,19 @@ export default function WaveSections({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const revealRef = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
-  const glassWideRef = useRef<HTMLDivElement>(null);
-  const glassCoreRef = useRef<HTMLDivElement>(null);
-  const turbulenceRef = useRef<SVGFETurbulenceElement>(null);
-  // each instance needs its own filter, or they'd all share one id
-  const filterId = `wave-glass-${useId().replace(/:/g, "")}`;
+  const maskPathRef = useRef<SVGPathElement>(null);
+  const maskBlurRef = useRef<SVGFEGaussianBlurElement>(null);
+  // each instance needs its own mask, or they'd all share one id
+  const uid = useId().replace(/:/g, "");
+  const maskId = `wave-mask-${uid}`;
+  const maskBlurId = `wave-mask-blur-${uid}`;
 
   useEffect(() => {
     const wrap = wrapRef.current;
     const reveal = revealRef.current;
-    const inner = innerRef.current;
-    const glassWide = glassWideRef.current;
-    const glassCore = glassCoreRef.current;
-    if (!wrap || !reveal || !inner || !glassWide || !glassCore) return;
+    if (!wrap || !reveal) return;
 
     let raf = 0;
-    const startedAt = performance.now();
 
     // a page of chapters means a loop each; only the one you're near matters
     let near = true;
@@ -110,34 +138,20 @@ export default function WaveSections({
       // the reveal finishes within `travel`, then the section simply holds
       const revealSpan = Math.max(1, scrolled * (travel / (travel + hold)));
       const progress = Math.min(1, Math.max(0, -rect.top / revealSpan));
-      const time = (performance.now() - startedAt) / 1000;
 
-      reveal.style.clipPath = revealPath(progress, time);
-      reveal.style.visibility = progress <= 0.001 ? "hidden" : "visible";
-      inner.style.transform = `scale(${ZOOM_FROM + (1 - ZOOM_FROM) * progress})`;
-
-      // the glass only exists while the two sections are meeting
-      const presence =
-        Math.sin(Math.PI * Math.min(1, Math.max(0, progress))) ** 0.5;
-      glassWide.style.clipPath = bandPath(progress, time, 13, 9);
-      glassCore.style.clipPath = bandPath(progress, time, 4.5, 3);
-      glassWide.style.opacity = String(presence);
-      glassCore.style.opacity = String(presence);
-      // backdrop-filter still costs while invisible, so take it out of the way
-      const glassVisibility = presence < 0.01 ? "hidden" : "visible";
-      glassWide.style.visibility = glassVisibility;
-      glassCore.style.visibility = glassVisibility;
-
-      // drift the refraction so the glass looks like moving liquid
-      const turbulence = turbulenceRef.current;
-      if (turbulence) {
-        const bx = 0.009 + Math.sin(time * 0.35) * 0.003;
-        const by = 0.022 + Math.cos(time * 0.27) * 0.006;
-        turbulence.setAttribute(
-          "baseFrequency",
-          `${bx.toFixed(5)} ${by.toFixed(5)}`,
-        );
+      const width = wrap.clientWidth || window.innerWidth;
+      const height = window.innerHeight;
+      const maskPath = maskPathRef.current;
+      if (maskPath) {
+        maskPath.setAttribute("d", wavePath(progress, width, height));
       }
+      // the original feathers over more than half the viewport; a blur of
+      // about a seventh of the height lands in the same place
+      const blur = maskBlurRef.current;
+      if (blur) {
+        blur.setAttribute("stdDeviation", (height * FEATHER * 0.22).toFixed(1));
+      }
+      reveal.style.visibility = progress <= 0.001 ? "hidden" : "visible";
 
       raf = requestAnimationFrame(frame);
     };
@@ -159,23 +173,24 @@ export default function WaveSections({
       }}
     >
       <svg aria-hidden className="pointer-events-none absolute h-0 w-0">
-        <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
-          <feTurbulence
-            ref={turbulenceRef}
-            type="fractalNoise"
-            baseFrequency="0.009 0.022"
-            numOctaves={2}
-            seed={7}
-            result="noise"
-          />
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="noise"
-            scale={26}
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
+        <filter
+          id={maskBlurId}
+          x="-40%"
+          y="-40%"
+          width="180%"
+          height="180%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur ref={maskBlurRef} stdDeviation="90" />
         </filter>
+        <mask id={maskId} maskContentUnits="userSpaceOnUse">
+          <path
+            ref={maskPathRef}
+            d=""
+            fill="#fff"
+            filter={`url(#${maskBlurId})`}
+          />
+        </mask>
       </svg>
 
       <div className="sticky top-0 h-[100svh] w-full overflow-hidden">
@@ -183,42 +198,15 @@ export default function WaveSections({
 
         <div
           ref={revealRef}
-          className="absolute inset-0 z-20 will-change-[clip-path]"
-          style={{ visibility: "hidden" }}
+          className="absolute inset-0 z-20"
+          style={{
+            visibility: "hidden",
+            mask: `url(#${maskId})`,
+            WebkitMask: `url(#${maskId})`,
+          }}
         >
-          <div
-            ref={innerRef}
-            className="h-full w-full origin-center will-change-transform"
-          >
-            {second}
-          </div>
+          <div className="h-full w-full">{second}</div>
         </div>
-
-        {/* thick, soft glass: the sections blur and bend through it */}
-        <div
-          ref={glassWideRef}
-          className="pointer-events-none absolute inset-0 z-30 will-change-[clip-path]"
-          style={{
-            opacity: 0,
-            backdropFilter: `blur(14px) saturate(115%) url(#${filterId})`,
-            WebkitBackdropFilter: "blur(14px) saturate(115%)",
-            background:
-              "linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0.01) 55%, rgba(255,255,255,0.05))",
-          }}
-        />
-
-        {/* the bright rim right on the edge, like the lip of a glass */}
-        <div
-          ref={glassCoreRef}
-          className="pointer-events-none absolute inset-0 z-40 will-change-[clip-path]"
-          style={{
-            opacity: 0,
-            backdropFilter: `blur(3px) brightness(1.12) url(#${filterId})`,
-            WebkitBackdropFilter: "blur(3px) brightness(1.12)",
-            background:
-              "linear-gradient(to bottom, rgba(255,255,255,0.20), rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.16))",
-          }}
-        />
       </div>
     </div>
   );

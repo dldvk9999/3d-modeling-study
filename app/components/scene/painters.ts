@@ -528,39 +528,99 @@ const BODIES: Record<PainterId, string> = {
   `,
 
   // a stepped pyramid of glowing blocks on a glossy floor scattered with
-  // small lit cubes
+  // Finance: a stepped pyramid of lit blocks on a wet floor, small glowing
+  // cubes scattered around it and dark pyramids behind, as the clip shows
   bars: `
-    vec3 paint(vec2 uv, float phase, float aspect) {
-      vec2 p = (uv - 0.5) * vec2(aspect, 1.0) * 1.25;
-      vec2 loop = loopVec(phase);
-      vec3 col = vec3(0.01);
-      float x = p.x + 0.06 * loop.y;
-      float floorY = -0.18;
-      float rowHeight = 0.07;
-      float y = p.y - floorY;
-      float row = floor(y / rowHeight);
-      float halfWidth = 0.52 - row * 0.065;
-      vec2 cell = vec2(fract((x + 2.0) / 0.1), fract(y / rowHeight));
-      float gaps = smoothstep(0.0, 0.08, cell.x) * smoothstep(1.0, 0.92, cell.x) * smoothstep(0.0, 0.1, cell.y) * smoothstep(1.0, 0.9, cell.y);
-      float body = step(0.0, row) * step(row, 7.0) * smoothstep(0.02, -0.02, abs(x) - halfWidth);
-      float shade = 0.8 + 0.2 * hash2(vec2(floor((x + 2.0) / 0.1), row));
-      col = mix(col, vec3(1.0, 0.9, 0.62) * shade, body * (0.5 + 0.5 * gaps));
-      // the glossy floor mirrors the lowest rows
-      float mirrorY = floorY - p.y;
-      float mirrorRow = floor(mirrorY / rowHeight);
-      float mirror = step(0.0, mirrorY) * step(mirrorRow, 2.0) * smoothstep(0.02, -0.02, abs(x) - (0.52 - mirrorRow * 0.065));
-      col += vec3(0.8, 0.8, 0.7) * mirror * 0.25 * exp(-mirrorY * 8.0);
-      // small cubes lit blue or amber, scattered across the floor
-      for (int i = 0; i < 14; i++) {
+    const float HORIZON = -0.13;
+
+    // one row of blocks, with its gaps and its slightly uneven lighting
+    float blockRow(vec2 p, float halfWidth, float baseY, float height, float pitch, out float shade) {
+      float inside = step(baseY, p.y) * step(p.y, baseY + height) * smoothstep(0.012, -0.012, abs(p.x) - halfWidth);
+      vec2 cell = vec2(fract((p.x + 4.0) / pitch), (p.y - baseY) / height);
+      float gapX = smoothstep(0.0, 0.14, cell.x) * smoothstep(1.0, 0.86, cell.x);
+      float gapY = smoothstep(0.0, 0.16, cell.y) * smoothstep(1.0, 0.84, cell.y);
+      shade = 0.82 + 0.18 * hash2(vec2(floor((p.x + 4.0) / pitch), floor(baseY * 120.0)));
+      return inside * (0.88 + 0.12 * gapX * gapY);
+    }
+
+    vec3 pyramid(vec2 p) {
+      vec3 col = vec3(0.0);
+      float pitch = 0.062;
+      float height = 0.042;
+      for (int i = 0; i < 9; i++) {
         float fi = float(i);
-        vec2 at = vec2((hash1(fi * 2.7) - 0.5) * 1.6 + 0.03 * loop.x, floorY - 0.04 - hash1(fi * 5.1) * 0.28);
-        float size = 0.018 + 0.02 * hash1(fi * 7.3);
-        float cube = fill(sdRoundBox(p - at, vec2(size), 0.003));
-        vec3 tint = hash1(fi * 9.9) < 0.5 ? vec3(0.55, 0.7, 1.0) : vec3(1.0, 0.75, 0.4);
-        col = mix(col, mix(vec3(0.95), tint, 0.5), cube);
-        col += tint * exp(-length(p - at) * 30.0) * 0.25;
+        float halfWidth = (fi < 0.5 ? 0.39 : 0.34) - fi * 0.034;
+        float shade;
+        float body = blockRow(p, halfWidth, HORIZON + fi * height, height, pitch, shade);
+        col = mix(col, mix(vec3(0.8, 0.78, 0.68), vec3(0.97, 0.96, 0.92), fi / 8.0) * shade, body);
       }
-      return clamp(col * 1.3, 0.0, 1.0);
+      // the light it throws into the air around it
+      col += vec3(1.0, 0.93, 0.76) * exp(-length((p - vec2(0.0, HORIZON + 0.14)) * vec2(1.4, 1.8)) * 4.0) * 0.16;
+      return col;
+    }
+
+    // the darker pyramids standing behind, in silhouette
+    vec3 backdropPyramids(vec2 p) {
+      vec3 col = vec3(0.0);
+      for (int i = 0; i < 2; i++) {
+        float side = i == 0 ? -1.0 : 1.0;
+        vec2 at = vec2(side * 0.62, HORIZON);
+        float up = (p.y - at.y) / 0.1;
+        float inside = step(0.0, up) * step(up, 1.0)
+          * smoothstep(0.02, -0.02, abs(p.x - at.x) - 0.19 * (1.0 - up));
+        col = mix(col, vec3(0.075, 0.085, 0.08) * (1.0 + 0.5 * up), inside);
+      }
+      return col;
+    }
+
+    vec3 paint(vec2 uv, float phase, float aspect) {
+      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+      vec2 loop = loopVec(phase);
+      // the camera drifts slowly across the scene
+      p.x += 0.045 * loop.x;
+
+      vec3 col = vec3(0.012, 0.013, 0.016);
+      col += vec3(0.1, 0.09, 0.07) * exp(-abs(p.y - HORIZON) * 7.0) * step(HORIZON, p.y);
+      col += vec3(0.62, 0.6, 0.48) * exp(-abs(p.y - HORIZON) * 16.0) * 0.16;
+      col += backdropPyramids(p);
+      col += pyramid(p);
+
+      // the floor mirrors what stands on it, smeared downward
+      if (p.y < HORIZON) {
+        float depth = HORIZON - p.y;
+        vec2 q = vec2(p.x + sin(p.y * 40.0) * 0.006 * depth, HORIZON + depth * 0.8);
+        float streak = 0.72 + 0.28 * sin(p.x * 130.0 + 1.3) * exp(-depth * 3.0);
+        col += pyramid(q) * exp(-depth * 4.0) * 0.45 * streak;
+        // light bouncing off the wet floor around the pyramid
+        col += vec3(0.85, 0.8, 0.62) * exp(-depth * 2.2) * exp(-abs(p.x) * 0.6) * 0.2;
+        col += vec3(0.5, 0.48, 0.4) * exp(-depth * 9.0) * 0.2;
+      }
+
+      // cubes standing about on the floor, lit white, blue or amber; the near
+      // ones are larger and softer, as the clip's shallow focus makes them
+      for (int i = 0; i < 26; i++) {
+        float fi = float(i);
+        float lane = hash1(fi * 2.7) * 2.0 - 1.0;
+        float depth = fract(hash1(fi * 5.1) + phase * 0.12);
+        float near = pow(depth, 1.7);
+        vec2 at = vec2(lane * (0.5 + near * 1.15) + 0.045 * loop.x, HORIZON - 0.015 - near * 0.4);
+        float size = 0.008 + 0.024 * near;
+        float soft = 0.003 + 0.03 * near * near;
+        vec3 tint = hash1(fi * 9.9) < 0.42
+          ? vec3(0.82, 0.88, 1.0)
+          : (hash1(fi * 13.1) < 0.25 ? vec3(1.0, 0.9, 0.72) : vec3(1.0, 0.98, 0.92));
+        float d = sdRoundBox(p - at, vec2(size), size * 0.12);
+        float body = smoothstep(soft, -soft, d);
+        col = mix(col, mix(vec3(1.0), tint, 0.55), body);
+        col += tint * exp(-max(d, 0.0) * 22.0) * 0.22;
+        // its reflection, stretched down the wet floor
+        float below = at.y - p.y;
+        if (below > 0.0) {
+          float mirror = smoothstep(soft * 2.0, -soft, sdRoundBox(vec2(p.x - at.x, below * 0.55 - size), vec2(size, size), size * 0.12));
+          col += tint * mirror * 0.22 * exp(-below * 5.0);
+        }
+      }
+      return clamp(col, 0.0, 1.0);
     }
   `,
 
@@ -649,7 +709,7 @@ const SATURATION: Record<PainterId, number> = {
   swirl: 0.92,
   cards: 0.56,
   vortex: 0.93,
-  bars: 0.59,
+  bars: 1.15,
   screens: 1.85,
   tiles: 1.48,
 };
