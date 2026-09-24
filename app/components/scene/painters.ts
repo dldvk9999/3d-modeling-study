@@ -451,16 +451,16 @@ const BODIES: Record<PainterId, string> = {
       float s = r * 6.0 + a / TAU - 0.15 * sin(TAU * phase);
       float band = smoothstep(-0.25, 0.45, cos(TAU * s));
       float groove = smoothstep(0.05, 0.0, abs(fract(s) - 0.5) - 0.44);
-      vec3 col = mix(vec3(0.13, 0.11, 0.32), vec3(0.88, 0.86, 1.0), band);
+      vec3 col = mix(vec3(0.05, 0.04, 0.14), vec3(0.95, 0.93, 1.0), band);
       col *= 0.9 + 0.12 * cos(a - 0.8);
-      col = mix(col, vec3(0.14, 0.12, 0.26), groove * 0.6);
+      col = mix(col, vec3(0.04, 0.03, 0.1), groove * 0.85);
       float gap = smoothstep(0.0, 0.08, fract(a / TAU - 0.06 * sin(TAU * phase) + 0.3));
       col += vec3(0.9, 0.88, 1.0) * exp(-max(r - 0.11, 0.0) * 16.0) * 0.3;
       // the white hook, then a lavender iris round a dark pupil
       col = mix(col, vec3(1.0), fill(abs(r - 0.09) - 0.03) * gap);
       col = mix(col, mix(vec3(0.42, 0.38, 0.72), vec3(0.2, 0.17, 0.42), smoothstep(0.06, 0.03, r)), fill(r - 0.06));
       col = mix(col, vec3(0.06, 0.05, 0.14), fill(r - 0.028));
-      return col;
+      return clamp((col) * 1.45, 0.0, 1.0);
     }
   `,
 

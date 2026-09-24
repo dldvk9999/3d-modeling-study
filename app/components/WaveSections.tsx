@@ -149,7 +149,7 @@ export default function WaveSections({
       // about a seventh of the height lands in the same place
       const blur = maskBlurRef.current;
       if (blur) {
-        blur.setAttribute("stdDeviation", (height * FEATHER * 0.22).toFixed(1));
+        blur.setAttribute("stdDeviation", (height * FEATHER * 0.3).toFixed(1));
       }
       reveal.style.visibility = progress <= 0.001 ? "hidden" : "visible";
 
@@ -181,9 +181,16 @@ export default function WaveSections({
           height="180%"
           colorInterpolationFilters="sRGB"
         >
-          <feGaussianBlur ref={maskBlurRef} stdDeviation="90" />
+          <feGaussianBlur ref={maskBlurRef} stdDeviation="120" />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="1.7" intercept="-0.35" />
+          </feComponentTransfer>
         </filter>
-        <mask id={maskId} maskContentUnits="userSpaceOnUse">
+        <mask
+          id={maskId}
+          maskContentUnits="userSpaceOnUse"
+          style={{ maskType: "alpha" }}
+        >
           <path
             ref={maskPathRef}
             d=""
