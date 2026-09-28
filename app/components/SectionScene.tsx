@@ -292,7 +292,12 @@ export default function SectionScene({ section }: { section: string }) {
         const n = reducedMotion ? 0 : screenOffset(section);
         // with the chapter's content over it, the scene steps back and slows
         const behindness = THREE.MathUtils.smoothstep(n, 0.25, 0.75);
-        const time = reducedMotion ? 0 : chapterTime(section, frameTime, 1 - behindness * (1 - behind.speed));
+        // The original all but stops a scene once its chapter's content is
+        // over it — it can, because that content is opaque and the scene is
+        // out of sight. Ours stays visible behind the text, so a scene that
+        // slow reads as frozen; it keeps at least half its pace instead.
+        const rate = 1 - behindness * (1 - Math.max(behind.speed, 0.5));
+        const time = reducedMotion ? 0 : chapterTime(section, frameTime, rate);
 
         fluid.step(dt, pointer, pointerVel);
         pointerVel.multiplyScalar(0.86);
