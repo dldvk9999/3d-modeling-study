@@ -456,12 +456,13 @@ const BODIES: Record<PainterId, string> = {
     vec3 paint(vec2 uv, float phase, float aspect) {
       // the whole spiral wanders a slow circle through the frame, the way the
       // original's does, and comes back where it started so the clip loops
-      vec2 drift = vec2(cos(TAU * phase), sin(TAU * phase) * 0.6) * 0.1;
+      vec2 drift = vec2(cos(TAU * phase), sin(TAU * phase) * 0.6) * 0.14;
       vec2 p = (uv - 0.5 - drift) * vec2(aspect, 1.0);
       float r = length(p);
       float a = atan(p.y, p.x);
-      // one tightly wound arm, close to concentric rings, rocking a little
-      float s = r * 6.0 + a / TAU - 0.15 * sin(TAU * phase);
+      // one tightly wound arm, close to concentric rings: it winds inward by one
+      // ring per loop and rocks as it goes
+      float s = r * 9.5 + a / TAU - phase - 0.15 * sin(TAU * phase);
       float band = smoothstep(-0.25, 0.45, cos(TAU * s));
       float groove = smoothstep(0.05, 0.0, abs(fract(s) - 0.5) - 0.44);
       vec3 col = mix(vec3(0.05, 0.04, 0.14), vec3(0.95, 0.93, 1.0), band);
@@ -473,11 +474,11 @@ const BODIES: Record<PainterId, string> = {
       float re = length(pe);
       float ae = atan(pe.y, pe.x);
       float gap = smoothstep(0.0, 0.08, fract(ae / TAU - 0.06 * sin(TAU * phase) + 0.3));
-      col += vec3(0.9, 0.88, 1.0) * exp(-max(re - 0.11, 0.0) * 16.0) * 0.3;
+      col += vec3(0.9, 0.88, 1.0) * exp(-max(re - 0.11, 0.0) * 22.0) * 0.14;
       // the white hook, then a lavender iris round a dark pupil
       col = mix(col, vec3(1.0), fill(abs(re - 0.09) - 0.03) * gap);
-      col = mix(col, mix(vec3(0.42, 0.38, 0.72), vec3(0.2, 0.17, 0.42), smoothstep(0.06, 0.03, re)), fill(re - 0.06));
-      col = mix(col, vec3(0.06, 0.05, 0.14), fill(re - 0.028));
+      col = mix(col, mix(vec3(0.42, 0.38, 0.72), vec3(0.2, 0.17, 0.42), smoothstep(0.08, 0.04, re)), fill(re - 0.08));
+      col = mix(col, vec3(0.06, 0.05, 0.14), fill(re - 0.046));
       return clamp((col) * 1.45, 0.0, 1.0);
     }
   `,
