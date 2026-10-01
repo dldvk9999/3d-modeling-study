@@ -86,6 +86,10 @@ const VOLUME_FRAG = `
   uniform vec2 uResolution;
   uniform float uOpacity;
   uniform float uBrightness;
+  // stand-in correction: our painted clip is not the original footage, so its
+  // gain and colourfulness are matched to it here, before the volume maths
+  uniform float uClipGain;
+  uniform float uClipSaturation;
   uniform float uThreshold;
   uniform float uSoftness;
   uniform float uEdgeFade;
@@ -171,6 +175,8 @@ const VOLUME_FRAG = `
       float z = fract(uvw.z * uLoopCount + uScrubOffset + uGridTimeOffset);
       vec4 tex = texture(uVolume, vec3(uvw.x, uvw.y, z));
       tex.rgb = pow(tex.rgb, vec3(2.2));
+      float clipLuma = dot(tex.rgb, vec3(0.2126, 0.7152, 0.0722));
+      tex.rgb = max(vec3(0.0), mix(vec3(clipLuma), tex.rgb, uClipSaturation) * uClipGain);
       float luma = max(max(tex.r, tex.g), tex.b);
       float density = smoothstep(uThreshold, uThreshold + max(0.0001, uSoftness), luma)
         * tex.a * uOpacity * sideFeather * uGridOpacity;
@@ -211,6 +217,8 @@ export function createLightVolume(
         uVolume: { value: frames.texture },
         uFluid: { value: null },
         uResolution: { value: new THREE.Vector2(1, 1) },
+        uClipGain: { value: settings.clip.gain },
+        uClipSaturation: { value: settings.clip.saturation },
         uOpacity: { value: settings.opacity },
         uBrightness: { value: settings.brightness },
         uThreshold: { value: Math.max(settings.threshold, 0.025) },

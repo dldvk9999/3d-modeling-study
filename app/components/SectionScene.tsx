@@ -68,6 +68,10 @@ function screenOffset(section: string) {
   return (vh - anchor.getBoundingClientRect().top) / vh;
 }
 
+// the original's clips are 50 frames spread over five seconds; that is the
+// length it plays them at unless a clip carries its own
+const CLIP_SECONDS = 5.208;
+
 const MAIN_SCALE = 0.75;
 
 export default function SectionScene({ section }: { section: string }) {
@@ -204,7 +208,7 @@ export default function SectionScene({ section }: { section: string }) {
       const lookMatrix = new THREE.Matrix4();
       const lookRotation = new THREE.Matrix4();
 
-      const placeCamera = (n: number, dt: number) => {
+      const placeCamera = (n: number, dt: number, behindness: number) => {
         const kf = cameraSettings.keyframes;
         const k = kf ? bezierEase(clamp01((n - kf.from) / (kf.to - kf.from)), kf.ease) : 0;
         rig.position.set(
@@ -232,11 +236,14 @@ export default function SectionScene({ section }: { section: string }) {
         // the pointer orbits the camera round its target
         const influence = cameraSettings.pointer;
         const active = pointerActive && !reducedMotion && influence !== null;
+        // the original lets a chapter hand back most of its pointer orbit once
+        // its own content is over the scene, and all of it for some chapters
+        const reach = 1 - behindness * (1 - behind.pointerInfluence);
         const yawGoal = active
-          ? THREE.MathUtils.mapLinear(pointerNdc.x, -1, 1, influence.yaw[0], influence.yaw[1]) * (Math.PI / 2)
+          ? THREE.MathUtils.mapLinear(pointerNdc.x, -1, 1, influence.yaw[0], influence.yaw[1]) * (Math.PI / 2) * reach
           : 0;
         const pitchGoal = active
-          ? THREE.MathUtils.mapLinear(-pointerNdc.y, -1, 1, influence.pitch[0], influence.pitch[1]) * (Math.PI / 2)
+          ? THREE.MathUtils.mapLinear(-pointerNdc.y, -1, 1, influence.pitch[0], influence.pitch[1]) * (Math.PI / 2) * reach
           : 0;
         const lambda = active ? 6 : 14;
         orbit.yaw = damp(orbit.yaw, yawGoal, lambda, dt);
@@ -302,11 +309,11 @@ export default function SectionScene({ section }: { section: string }) {
         fluid.step(dt, pointer, pointerVel);
         pointerVel.multiplyScalar(0.86);
         const screen = frameView();
-        placeCamera(n, dt);
+        placeCamera(n, dt, behindness);
 
         for (const volume of volumes) {
           const s = volume.settings;
-          const passes = (time * s.playbackSpeed) / (s.duration ?? 1) + n * s.scrollScrub;
+          const passes = (time * s.playbackSpeed) / (s.duration ?? CLIP_SECONDS) + n * s.scrollScrub;
           volume.update({
             scrubOffset: ((passes % 1) + 1) % 1,
             loadFade,

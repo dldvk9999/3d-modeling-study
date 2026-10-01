@@ -43,6 +43,11 @@ const VERT = `
   uniform sampler2D uFluid;
   uniform float uFluidInfluence;
   // the chapter's selective colour grade: nine ranges of (hue turn, saturation, lightness)
+  // the stand-in clouds are drawn, not captured, so each chapter carries a
+  // gain and a lift that put its points in the same tonal range as the
+  // original capture before the grade runs
+  uniform float uToneGain;
+  uniform float uToneLift;
   uniform float uSelectiveAmount;
   uniform vec3 uSelectiveAdj[9];
 
@@ -222,7 +227,7 @@ const VERT = `
       pos = rotateZ(rotateY(rotateX(gridPos, uGridRotation.x), uGridRotation.y), uGridRotation.z);
     }
 
-    vColor = applySelectiveColor(color);
+    vColor = applySelectiveColor(clamp(color * uToneGain + uToneLift, 0.0, 1.0));
     vec4 world = modelMatrix * vec4(pos, 1.0);
     world.xyz += normalize(mat3(modelMatrix) * uConveyorAxis) * conveyorOffset;
     vec4 mv = viewMatrix * world;
@@ -359,6 +364,8 @@ export function createPointCloud(settings: CloudSettings, count: number): PointC
       uPointSize: { value: settings.pointSize * settings.sizeScalar },
       uMaxPointSize: { value: settings.maxPointSize * settings.sizeScalar },
       uDPR: { value: 1 },
+      uToneGain: { value: settings.tone.gain },
+      uToneLift: { value: settings.tone.lift },
       uOpacity: { value: settings.opacity },
       uTransparent: { value: opaque ? 0 : 1 },
       uLoadFade: { value: 0 },

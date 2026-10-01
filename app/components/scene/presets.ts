@@ -23,6 +23,9 @@ export type VolumeSettings = {
   depth: number;
   opacity: number;
   brightness: number;
+  /** stand-in correction: puts our painted clip in the tonal range of the
+   *  original footage it stands in for */
+  clip: { gain: number; saturation: number };
   threshold: number;
   softness: number;
   edgeFade: number;
@@ -44,9 +47,9 @@ export type VolumeSettings = {
     randomTimeOffset: number;
     outerOpacity: number;
   };
-  /** seconds for one pass through the clip; the original's clips are 1s */
+  /** seconds for one pass through this clip, when it differs from the usual 5.208 */
   duration?: number;
-  /** measure brightness on the stored (sRGB) values rather than linear ones */
+  /** measure brightness on the stored (sRGB) values rather than linear ones */
 };
 
 export type CloudSettings = {
@@ -63,6 +66,10 @@ export type CloudSettings = {
   opacity: number;
   transparent: boolean;
   blend: "additive" | "normal";
+  /** stand-in correction: our clouds are drawn rather than captured, so each
+   *  chapter puts its points in the tonal range of the original's capture
+   *  before the grade runs */
+  tone: { gain: number; lift: number };
   randomize: Vec3;
   cameraFade: { enabled: boolean; near: number; far: number };
   distanceSize: { influence: number; near: number; far: number; max: number };
@@ -140,13 +147,13 @@ export type SectionPreset = {
   cloud: CloudSettings;
   volumes: VolumeSettings[];
   post: PostSettings;
-  behind: { darken: number; saturation: number; speed: number };
+  behind: { darken: number; saturation: number; speed: number; pointerInfluence: number };
 };
 
 const noGrid = { enabled: false, size: 1, strength: 0, mix: [0, 0, 0] as Vec3, rotation: [0, 0, 0] as Vec3 };
 
 export const PRESETS: Record<string, SectionPreset> = {
-  agentic: {
+  agentic: {
     camera: {
       position: [-0.012337694942119056, 0.07944265448797339, -0.44905051315225064],
       target: [0.2057636663094521, -0.0705398556730998, 0.5073804838572582],
@@ -177,6 +184,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.53,
       transparent: true,
       blend: "additive",
+      tone: { gain: 1.4, lift: 0.2 },
       randomize: [0.198, 0.002, 0.004],
       cameraFade: { enabled: true, near: 0, far: 1.95 },
       distanceSize: { influence: 0.25, near: 4, far: 18, max: 1.55 },
@@ -200,6 +208,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 3.5,
         opacity: 2,
         brightness: 2.1,
+        clip: { gain: 5, saturation: 0.5 },
         threshold: 0.025,
         softness: 0.441,
         edgeFade: 0,
@@ -212,7 +221,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         fluidDepthStrength: [3, -2],
         hsl: [0, 0, 0],
         grid: { columns: 3, rows: 3, spacing: [0.815, 0.9], randomTimeOffset: 0.87, outerOpacity: 0.24 },
-        duration: 5.94,
+        duration: 5.94,
       },
     ],
     post: {
@@ -223,10 +232,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.99, damp: 0.99, threshold: 0 },
       noise: 0.010443037974683544,
     },
-    behind: { darken: 0.35, saturation: 0.8, speed: 0.02 },
+    behind: { darken: 0.35, saturation: 0.8, speed: 0.02, pointerInfluence: 0.1 },
   },
 
-  sidekick: {
+  sidekick: {
     camera: {
       position: [-0.065, -0.838, 1.385],
       target: [-0.763, -0.698, 0.086],
@@ -239,16 +248,17 @@ export const PRESETS: Record<string, SectionPreset> = {
     backdrop: { kind: "environment", environment: "autumnField", intensity: 1 - 0.6075949367088608, rotation: [0, 0, Math.PI] },
     cloud: {
       builder: "arches",
-      count: 65536,
+      count: 200000,
       position: [-2.7, 1.96, -2.44],
       rotationDeg: [0, -21.9, -2.9],
       scale: 5.19,
       pointSize: 0.015,
       maxPointSize: 1.804,
-      sizeScalar: 1,
+      sizeScalar: 1.8,
       opacity: 0.89,
       transparent: true,
       blend: "additive",
+      tone: { gain: 1.9, lift: 0.2 },
       randomize: [0.05, 0, 0],
       cameraFade: { enabled: true, near: 0, far: 4.5 },
       distanceSize: { influence: 0.19, near: 4, far: 18, max: 1.5 },
@@ -275,6 +285,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 1.21,
         opacity: 1.58,
         brightness: 1.6,
+        clip: { gain: 1, saturation: 1.2 },
         threshold: 0.055,
         softness: 0.96,
         edgeFade: 0.28,
@@ -299,6 +310,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 3.8,
         opacity: 1.13,
         brightness: 4,
+        clip: { gain: 1, saturation: 1.2 },
         threshold: 0.025,
         softness: 0.001,
         edgeFade: 0,
@@ -320,10 +332,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.835, damp: 0.329, threshold: 0.2 },
       noise: 0,
     },
-    behind: { darken: 0, saturation: 1, speed: 0.2 },
+    behind: { darken: 0, saturation: 1, speed: 0.2, pointerInfluence: 0.6 },
   },
 
-  online: {
+  online: {
     camera: {
       position: [-0.043, -0.246, 0.52],
       target: [-0.085, -0.161, 0.015],
@@ -355,6 +367,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 1,
       transparent: false,
       blend: "normal",
+      tone: { gain: 3.2, lift: 0.12 },
       randomize: [0.001, 0.001, 0.001],
       cameraFade: { enabled: false, near: 1.9, far: 8.25 },
       distanceSize: { influence: 0.25, near: 4, far: 18, max: 1.5 },
@@ -381,6 +394,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 4.3,
         opacity: 1.37,
         brightness: 3.95,
+        clip: { gain: 0.6, saturation: 1.6 },
         threshold: 0.235,
         softness: 0.161,
         edgeFade: 0,
@@ -405,6 +419,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 4.5,
         opacity: 2 * 0.7699999999999997,
         brightness: 1.6,
+        clip: { gain: 0.6, saturation: 1.6 },
         threshold: 0.025,
         softness: 0.001,
         edgeFade: 0,
@@ -427,10 +442,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.99, damp: 0.99, threshold: 0 },
       noise: 0,
     },
-    behind: { darken: 0.4, saturation: 0.87, speed: 0.1 },
+    behind: { darken: 0.4, saturation: 0.87, speed: 0.1, pointerInfluence: 0 },
   },
 
-  retail: {
+  retail: {
     camera: {
       position: [-0.484, -0.689, 0.884],
       target: [-0.281, -0.672, 0.421],
@@ -462,6 +477,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.83,
       transparent: true,
       blend: "normal",
+      tone: { gain: 0.45, lift: 0.12 },
       randomize: [0.014, 0.009, 0.056],
       cameraFade: { enabled: true, near: 0.2, far: 2.5 },
       distanceSize: { influence: 0.25, near: 4, far: 18, max: 1.5 },
@@ -488,6 +504,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 3.2,
         opacity: 2,
         brightness: 2.7,
+        clip: { gain: 1.4, saturation: 1.6 },
         threshold: 0.075,
         softness: 0.3,
         edgeFade: 0,
@@ -512,6 +529,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 8.31,
         opacity: 1.71,
         brightness: 1,
+        clip: { gain: 1.4, saturation: 1.6 },
         threshold: 0.025,
         softness: 0.591,
         edgeFade: 0.06,
@@ -533,10 +551,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.835, damp: 0.329, threshold: 0.2 },
       noise: 0,
     },
-    behind: { darken: 0.25, saturation: 0.91, speed: 0.15 },
+    behind: { darken: 0.25, saturation: 0.91, speed: 0.15, pointerInfluence: 0.6 },
   },
 
-  marketing: {
+  marketing: {
     camera: {
       position: [0.534, 0.23, -0.653],
       target: [0.052, 0.307, 1.482],
@@ -559,6 +577,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.5,
       transparent: true,
       blend: "additive",
+      tone: { gain: 0.45, lift: 0 },
       randomize: [0, 0, 0],
       cameraFade: { enabled: true, near: 0, far: 4.2 },
       distanceSize: { influence: 0.25, near: 4, far: 18, max: 1.55 },
@@ -585,6 +604,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 4,
         opacity: 2,
         brightness: 1.6,
+        clip: { gain: 1.8, saturation: 0.5 },
         threshold: 0.025,
         softness: 0.001,
         edgeFade: 0,
@@ -607,10 +627,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.99, damp: 0.999, threshold: 0 },
       noise: 0,
     },
-    behind: { darken: 0.5, saturation: 0.6, speed: 0.06 },
+    behind: { darken: 0.5, saturation: 0.6, speed: 0.06, pointerInfluence: 0.1 },
   },
 
-  operations: {
+  operations: {
     camera: {
       position: [-1.721, -0.03, -0.369],
       target: [-0.335, -0.008, -0.396],
@@ -642,6 +662,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.65,
       transparent: true,
       blend: "normal",
+      tone: { gain: 1, lift: 0.2 },
       randomize: [0.2, 0.2, 0.2],
       cameraFade: { enabled: false, near: 0, far: 5.8 },
       distanceSize: { influence: 0.25, near: 4, far: 18, max: 1.5 },
@@ -668,6 +689,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 4.9,
         opacity: 2,
         brightness: 2,
+        clip: { gain: 1.4, saturation: 0.3 },
         threshold: 0.025,
         softness: 0.001,
         edgeFade: 0,
@@ -689,10 +711,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.99, damp: 0.99, threshold: 0 },
       noise: 0,
     },
-    behind: { darken: 0.3, saturation: 0.88, speed: 0.15 },
+    behind: { darken: 0.3, saturation: 0.88, speed: 0.15, pointerInfluence: 0 },
   },
 
-  "shop-app": {
+  "shop-app": {
     camera: {
       position: [-0.126, 0.384, 1.864],
       target: [-0.126, 0.369, -0.056],
@@ -715,6 +737,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.45,
       transparent: true,
       blend: "additive",
+      tone: { gain: 0.45, lift: 0 },
       randomize: [1.26, 1.69, 2],
       cameraFade: { enabled: true, near: 0, far: 14.05 },
       distanceSize: { influence: 1, near: 4, far: 18, max: 1.5 },
@@ -738,6 +761,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 2.61,
         opacity: 2,
         brightness: 2.3,
+        clip: { gain: 0.8, saturation: 2.2 },
         threshold: 0.025,
         softness: 0.061,
         edgeFade: 0,
@@ -759,10 +783,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.99, damp: 0.99, threshold: 0 },
       noise: 0,
     },
-    behind: { darken: 0.3, saturation: 0.8, speed: 0.1 },
+    behind: { darken: 0.3, saturation: 0.8, speed: 0.1, pointerInfluence: 0 },
   },
 
-  payments: {
+  payments: {
     camera: {
       position: [-0.597, -0.443, 0.532],
       target: [-0.685, -0.397, -0.35],
@@ -785,6 +809,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.45,
       transparent: true,
       blend: "normal",
+      tone: { gain: 0.45, lift: 0 },
       randomize: [0.19, 2, 2],
       cameraFade: { enabled: false, near: 0, far: 1.05 },
       distanceSize: { influence: 0.25, near: 4, far: 18, max: 1.5 },
@@ -808,6 +833,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 1.34,
         opacity: 2,
         brightness: 2,
+        clip: { gain: 1, saturation: 0.5 },
         threshold: 0.035,
         softness: 0.161,
         edgeFade: 0,
@@ -832,6 +858,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 5.86,
         opacity: 2,
         brightness: 2.65,
+        clip: { gain: 1, saturation: 0.5 },
         threshold: 0.025,
         softness: 0.101,
         edgeFade: 0.4,
@@ -853,10 +880,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.98, damp: 0.95, threshold: 0.2 },
       noise: 0,
     },
-    behind: { darken: 0.35, saturation: 0.8, speed: 0.1 },
+    behind: { darken: 0.35, saturation: 0.8, speed: 0.1, pointerInfluence: 0.1 },
   },
 
-  finance: {
+  finance: {
     camera: {
       position: [-0.305, 0.025, 0.909],
       target: [-0.349, 0.029, -0.543],
@@ -888,6 +915,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.56,
       transparent: true,
       blend: "normal",
+      tone: { gain: 1, lift: 0 },
       randomize: [0, 0, 0],
       cameraFade: { enabled: true, near: 0, far: 5.8 },
       distanceSize: { influence: 0.25, near: 4, far: 18, max: 1.5 },
@@ -914,6 +942,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 0.26,
         opacity: 2,
         brightness: 1.65,
+        clip: { gain: 0.8, saturation: 2.2 },
         threshold: 0.025,
         softness: 1,
         edgeFade: 0,
@@ -935,10 +964,10 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.99, damp: 0.95, threshold: 0.2 },
       noise: 0,
     },
-    behind: { darken: 0.5, saturation: 0.7, speed: 0.2 },
+    behind: { darken: 0.5, saturation: 0.7, speed: 0.2, pointerInfluence: 0 },
   },
 
-  developer: {
+  developer: {
     camera: {
       position: [0.376, -0.053, 0.809],
       target: [0.11, -0.019, -0.168],
@@ -970,6 +999,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       opacity: 0.63,
       transparent: true,
       blend: "normal",
+      tone: { gain: 0.45, lift: 0 },
       randomize: [0.008, 0.002, 0],
       cameraFade: { enabled: true, near: 1, far: 5 },
       distanceSize: { influence: 0.25, near: 4.4, far: 18, max: 1.5 },
@@ -993,6 +1023,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 1.26,
         opacity: 2,
         brightness: 4,
+        clip: { gain: 1.4, saturation: 0.3 },
         threshold: 0.025,
         softness: 0.23,
         edgeFade: 0,
@@ -1017,6 +1048,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 3.5,
         opacity: 2,
         brightness: 1.3,
+        clip: { gain: 1.4, saturation: 0.3 },
         threshold: 0.36,
         softness: 0.451,
         edgeFade: 0.06,
@@ -1039,7 +1071,7 @@ export const PRESETS: Record<string, SectionPreset> = {
       afterimage: { strength: 0.95, damp: 0.99, threshold: 0 },
       noise: 0,
     },
-    behind: { darken: 0.2, saturation: 1, speed: 0.1 },
+    behind: { darken: 0.2, saturation: 1, speed: 0.1, pointerInfluence: 0.1 },
   },
 };
 
