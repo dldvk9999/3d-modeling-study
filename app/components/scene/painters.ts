@@ -460,14 +460,16 @@ const BODIES: Record<PainterId, string> = {
       vec2 p = (uv - 0.5 - drift) * vec2(aspect, 1.0);
       float r = length(p);
       float a = atan(p.y, p.x);
-      // one tightly wound arm, close to concentric rings: it winds inward by one
-      // ring per loop and rocks as it goes
-      float s = r * 9.5 + a / TAU - phase - 0.15 * sin(TAU * phase);
+      // the arm does not just turn: the ring spacing breathes and a ripple runs
+      // round it, so the clip keeps changing even where a rigid spin would look
+      // the same (the volume reads depth as time, and a rigid spin averages out)
+      float ripple = 0.07 * sin(TAU * (phase * 2.0 + a * 1.5)) + 0.04 * sin(TAU * (phase * 3.0 - r * 4.0));
+      float s = r * (9.5 + 0.5 * sin(TAU * phase)) + a / TAU - phase + ripple;
       float band = smoothstep(-0.25, 0.45, cos(TAU * s));
       float groove = smoothstep(0.05, 0.0, abs(fract(s) - 0.5) - 0.44);
-      vec3 col = mix(vec3(0.05, 0.04, 0.14), vec3(0.95, 0.93, 1.0), band);
+      vec3 col = mix(vec3(0.03, 0.025, 0.085), vec3(0.95, 0.93, 1.0), band);
       col *= 0.9 + 0.12 * cos(a - 0.8);
-      col = mix(col, vec3(0.04, 0.03, 0.1), groove * 0.85);
+      col = mix(col, vec3(0.022, 0.018, 0.065), groove * 0.85);
       // the eye keeps nearly still while the bands sweep past it, so it stays
       // a sharp ring rather than smearing into them
       vec2 pe = (uv - 0.5 - drift * 0.25) * vec2(aspect, 1.0);

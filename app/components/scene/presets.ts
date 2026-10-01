@@ -764,7 +764,7 @@ export const PRESETS: Record<string, SectionPreset> = {
         depth: 2.61,
         opacity: 2,
         brightness: 2.3,
-        clip: { gain: 0.95, saturation: 3.19 },
+        clip: { gain: 1.4, saturation: 3.19 },
         threshold: 0.025,
         softness: 0.061,
         edgeFade: 0,
