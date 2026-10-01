@@ -189,7 +189,10 @@ const BODIES: Record<PainterId, string> = {
       if (abs(index) <= 6.0) {
         float x = p.x - index * spacing;
         float envelope = 1.0 - abs(index) / 7.2;
-        float pulse = 0.6 + 0.4 * sin(TAU * (phase * 2.0 + hash1(index * 3.7 + 1.0)));
+        float pulse = 0.45 + 0.55 * sin(TAU * (phase * 2.0 + hash1(index * 3.7 + 1.0)));
+        // a brightness wave runs along the row, as the original's stripes do,
+        // taking nothing off the average as it goes
+        float sweep = 1.0 + 0.6 * sin(TAU * (phase + index * 0.11));
         float halfHeight = 0.42 * envelope * pulse + 0.02;
         vec2 q = vec2(x, max(abs(p.y) - halfHeight, 0.0));
         float d = length(q) - 0.034;
@@ -204,7 +207,7 @@ const BODIES: Record<PainterId, string> = {
         vec3 top = pick < 0.3 ? pink : pick < 0.6 ? lilac : pick < 0.8 ? cream : sky;
         vec3 bottom = pick < 0.3 ? cream : pick < 0.6 ? pink : pick < 0.8 ? sky : lilac;
         float t = clamp(p.y / max(halfHeight, 0.001) * 0.5 + 0.5, 0.0, 1.0);
-        vec3 tone = mix(bottom, top, t) * mix(1.0, 0.6, reflected);
+        vec3 tone = mix(bottom, top, t) * mix(1.0, 0.6, reflected) * sweep;
         col = mix(col, tone, bar) + tone * glow * (1.0 - bar);
       }
       return col;
@@ -421,7 +424,9 @@ const BODIES: Record<PainterId, string> = {
     vec3 paint(vec2 uv, float phase, float aspect) {
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec3 col = vec3(0.01, 0.012, 0.02) + vec3(0.03, 0.035, 0.05) * (1.0 - length(p));
-      vec2 q = p;
+      // the original's globe crosses the frame as it turns; ours makes the
+      // same trip and closes the loop
+      vec2 q = p - vec2(0.17 * cos(TAU * phase), 0.06 * sin(TAU * phase));
       float r = length(q) / 0.42;
       if (r < 1.0) {
         float z = sqrt(1.0 - r * r);
@@ -436,7 +441,12 @@ const BODIES: Record<PainterId, string> = {
         float light = 0.35 + 0.65 * max(dot(n, normalize(vec3(-0.5, 0.6, 0.6))), 0.0);
         col = surface * light + vec3(0.4, 0.6, 1.0) * pow(1.0 - z, 3.0) * 0.8;
       }
-      col += vec3(0.3, 0.5, 1.0) * smoothstep(1.08, 1.0, r) * smoothstep(0.96, 1.0, r) * 0.6;
+      // the original's globe is ringed by a bright rim, greenest where the
+      // light catches its lower left, and that edge is what reads as a sphere
+      float rim = smoothstep(1.1, 1.0, r) * smoothstep(0.94, 1.0, r);
+      vec2 dir = q / max(length(q), 0.0001);
+      float side = 0.3 + 0.7 * max(0.0, -dir.x * 0.55 - dir.y * 0.84);
+      col += mix(vec3(0.3, 0.5, 1.0), vec3(0.72, 1.0, 0.5), side) * rim * 0.55;
       return col * 1.12;
     }
   `,
@@ -444,7 +454,10 @@ const BODIES: Record<PainterId, string> = {
   // the Shop swirl: lavender bands winding into a white hook round a dark eye
   swirl: `
     vec3 paint(vec2 uv, float phase, float aspect) {
-      vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
+      // the whole spiral wanders a slow circle through the frame, the way the
+      // original's does, and comes back where it started so the clip loops
+      vec2 drift = vec2(cos(TAU * phase), sin(TAU * phase) * 0.6) * 0.1;
+      vec2 p = (uv - 0.5 - drift) * vec2(aspect, 1.0);
       float r = length(p);
       float a = atan(p.y, p.x);
       // one tightly wound arm, close to concentric rings, rocking a little
@@ -454,12 +467,17 @@ const BODIES: Record<PainterId, string> = {
       vec3 col = mix(vec3(0.05, 0.04, 0.14), vec3(0.95, 0.93, 1.0), band);
       col *= 0.9 + 0.12 * cos(a - 0.8);
       col = mix(col, vec3(0.04, 0.03, 0.1), groove * 0.85);
-      float gap = smoothstep(0.0, 0.08, fract(a / TAU - 0.06 * sin(TAU * phase) + 0.3));
-      col += vec3(0.9, 0.88, 1.0) * exp(-max(r - 0.11, 0.0) * 16.0) * 0.3;
+      // the eye keeps nearly still while the bands sweep past it, so it stays
+      // a sharp ring rather than smearing into them
+      vec2 pe = (uv - 0.5 - drift * 0.25) * vec2(aspect, 1.0);
+      float re = length(pe);
+      float ae = atan(pe.y, pe.x);
+      float gap = smoothstep(0.0, 0.08, fract(ae / TAU - 0.06 * sin(TAU * phase) + 0.3));
+      col += vec3(0.9, 0.88, 1.0) * exp(-max(re - 0.11, 0.0) * 16.0) * 0.3;
       // the white hook, then a lavender iris round a dark pupil
-      col = mix(col, vec3(1.0), fill(abs(r - 0.09) - 0.03) * gap);
-      col = mix(col, mix(vec3(0.42, 0.38, 0.72), vec3(0.2, 0.17, 0.42), smoothstep(0.06, 0.03, r)), fill(r - 0.06));
-      col = mix(col, vec3(0.06, 0.05, 0.14), fill(r - 0.028));
+      col = mix(col, vec3(1.0), fill(abs(re - 0.09) - 0.03) * gap);
+      col = mix(col, mix(vec3(0.42, 0.38, 0.72), vec3(0.2, 0.17, 0.42), smoothstep(0.06, 0.03, re)), fill(re - 0.06));
+      col = mix(col, vec3(0.06, 0.05, 0.14), fill(re - 0.028));
       return clamp((col) * 1.45, 0.0, 1.0);
     }
   `,
